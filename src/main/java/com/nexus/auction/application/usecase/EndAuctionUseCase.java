@@ -32,6 +32,12 @@ public class EndAuctionUseCase {
         if (auction == null || auction.getStatus() != AuctionStatus.ACTIVE) {
             return;
         }
+        // Re-check end_time too, not just status: a bid's anti-sniping extension may have
+        // pushed end_time forward after the job's list query found this auction "ready to
+        // end" but before this use case acquired the row lock.
+        if (auction.getEndTime().isAfter(Instant.now())) {
+            return;
+        }
 
         boolean hasWinner = auction.getCurrentHighestBidderId() != null;
         Auction ended;
