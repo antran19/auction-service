@@ -38,7 +38,7 @@ public class PlaceBidUseCase {
         Auction auction = auctionRepositoryPort.findByIdForUpdate(auctionId)
                 .orElseThrow(() -> new AuctionNotFoundException(auctionId));
 
-        BidValidationPolicy.validate(auction, amount);
+        BidValidationPolicy.validate(auction, bidderId, amount, Instant.now());
 
         String previousHighestBidderId = auction.getCurrentHighestBidderId();
 
