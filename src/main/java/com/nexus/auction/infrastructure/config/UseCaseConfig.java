@@ -4,7 +4,9 @@ import com.nexus.auction.application.port.out.AuctionRepositoryPort;
 import com.nexus.auction.application.port.out.EventPublisherPort;
 import com.nexus.auction.application.usecase.AdminCancelAuctionUseCase;
 import com.nexus.auction.application.usecase.CancelAuctionUseCase;
+import com.nexus.auction.application.port.out.BidRepositoryPort;
 import com.nexus.auction.application.usecase.CreateAuctionUseCase;
+import com.nexus.auction.application.usecase.PlaceBidUseCase;
 import com.nexus.auction.application.usecase.UpdateAuctionUseCase;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,5 +35,11 @@ public class UseCaseConfig {
     public AdminCancelAuctionUseCase adminCancelAuctionUseCase(AuctionRepositoryPort auctionPort,
                                                                  EventPublisherPort eventPublisherPort) {
         return new AdminCancelAuctionUseCase(auctionPort, eventPublisherPort);
+    }
+
+    @Bean
+    public PlaceBidUseCase placeBidUseCase(AuctionRepositoryPort auctionPort, BidRepositoryPort bidPort,
+                                            EventPublisherPort eventPublisherPort) {
+        return new PlaceBidUseCase(auctionPort, bidPort, eventPublisherPort);
     }
 }
