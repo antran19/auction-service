@@ -21,7 +21,7 @@ public class UpdateAuctionUseCase {
     @Transactional
     public AuctionResult update(String id, BigDecimal startingPrice, BigDecimal bidIncrement,
                                  Instant startTime, Instant endTime, String callerId) {
-        Auction existing = auctionRepositoryPort.findById(id).orElseThrow(() -> new AuctionNotFoundException(id));
+        Auction existing = auctionRepositoryPort.findByIdForUpdate(id).orElseThrow(() -> new AuctionNotFoundException(id));
         AuctionOwnershipPolicy.requireOwner(existing, callerId);
         if (existing.getStatus() != AuctionStatus.PENDING) {
             throw new ConflictException("AUCTION_NOT_EDITABLE",

@@ -21,7 +21,7 @@ public class CancelAuctionUseCase {
 
     @Transactional
     public AuctionResult cancel(String id, String callerId) {
-        Auction existing = auctionRepositoryPort.findById(id).orElseThrow(() -> new AuctionNotFoundException(id));
+        Auction existing = auctionRepositoryPort.findByIdForUpdate(id).orElseThrow(() -> new AuctionNotFoundException(id));
         AuctionOwnershipPolicy.requireOwner(existing, callerId);
 
         boolean eligible = existing.getStatus() == AuctionStatus.PENDING

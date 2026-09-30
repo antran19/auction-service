@@ -30,6 +30,11 @@ class AdminCancelAuctionUseCaseTest {
         eventPublisherPort = mock(EventPublisherPort.class);
         useCase = new AdminCancelAuctionUseCase(auctionRepositoryPort, eventPublisherPort);
         when(auctionRepositoryPort.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+        // Poison pill: cancel() must use the locked read (findByIdForUpdate), never the
+        // unlocked one, or it could overwrite a concurrent EndAuctionUseCase settlement
+        // (publishing AuctionWon and AuctionCancelled for the same auction).
+        when(auctionRepositoryPort.findById(any())).thenThrow(new AssertionError(
+                "AdminCancelAuctionUseCase must call findByIdForUpdate, not findById"));
     }
 
     @Test
@@ -38,7 +43,7 @@ class AdminCancelAuctionUseCaseTest {
         Auction auction = Auction.create("product-1", "seller-1", new BigDecimal("100.00"), new BigDecimal("10.00"),
                         start, start.plus(2, ChronoUnit.HOURS))
                 .withStatus(AuctionStatus.ACTIVE).withBid("bidder-1", new BigDecimal("100.00"));
-        when(auctionRepositoryPort.findById(auction.getId())).thenReturn(Optional.of(auction));
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
 
         AuctionResult result = useCase.cancel(auction.getId(), "admin-1");
 
@@ -52,7 +57,7 @@ class AdminCancelAuctionUseCaseTest {
         Auction ended = Auction.create("product-1", "seller-1", new BigDecimal("100.00"), new BigDecimal("10.00"),
                         start, start.plus(1, ChronoUnit.HOURS))
                 .withStatus(AuctionStatus.ENDED);
-        when(auctionRepositoryPort.findById(ended.getId())).thenReturn(Optional.of(ended));
+        when(auctionRepositoryPort.findByIdForUpdate(ended.getId())).thenReturn(Optional.of(ended));
 
         assertThatThrownBy(() -> useCase.cancel(ended.getId(), "admin-1"))
                 .isInstanceOf(ConflictException.class);

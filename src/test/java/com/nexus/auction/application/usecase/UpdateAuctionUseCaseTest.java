@@ -29,6 +29,13 @@ class UpdateAuctionUseCaseTest {
         auctionRepositoryPort = mock(AuctionRepositoryPort.class);
         useCase = new UpdateAuctionUseCase(auctionRepositoryPort);
         when(auctionRepositoryPort.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+        // findById is stubbed to a wrong value on purpose: update() must use the locked
+        // read (findByIdForUpdate), never the unlocked one, or a concurrent bid/settlement
+        // between the unlocked read and the save() could be silently overwritten. If update()
+        // regresses to findById, this stub makes every test fail with AuctionNotFoundException
+        // instead of passing by accident.
+        when(auctionRepositoryPort.findById(any())).thenThrow(new AssertionError(
+                "UpdateAuctionUseCase must call findByIdForUpdate, not findById"));
     }
 
     private Auction pendingAuction() {
@@ -40,7 +47,7 @@ class UpdateAuctionUseCaseTest {
     @Test
     void update_updatesPriceIncrementAndWindowWhilePending() {
         Auction auction = pendingAuction();
-        when(auctionRepositoryPort.findById(auction.getId())).thenReturn(Optional.of(auction));
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
         Instant newStart = Instant.now().plus(3, ChronoUnit.HOURS);
 
         AuctionResult result = useCase.update(auction.getId(), new BigDecimal("150.00"), new BigDecimal("15.00"),
@@ -53,7 +60,7 @@ class UpdateAuctionUseCaseTest {
     @Test
     void update_rejectsNonOwner() {
         Auction auction = pendingAuction();
-        when(auctionRepositoryPort.findById(auction.getId())).thenReturn(Optional.of(auction));
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
 
         assertThatThrownBy(() -> useCase.update(auction.getId(), new BigDecimal("150.00"),
                 new BigDecimal("15.00"), auction.getStartTime(), auction.getEndTime(), "other-seller"))
@@ -63,7 +70,7 @@ class UpdateAuctionUseCaseTest {
     @Test
     void update_rejectsWhenAuctionNotPending() {
         Auction active = pendingAuction().withStatus(AuctionStatus.ACTIVE);
-        when(auctionRepositoryPort.findById(active.getId())).thenReturn(Optional.of(active));
+        when(auctionRepositoryPort.findByIdForUpdate(active.getId())).thenReturn(Optional.of(active));
 
         assertThatThrownBy(() -> useCase.update(active.getId(), new BigDecimal("150.00"),
                 new BigDecimal("15.00"), active.getStartTime(), active.getEndTime(), "seller-1"))
@@ -72,7 +79,7 @@ class UpdateAuctionUseCaseTest {
 
     @Test
     void update_throwsNotFoundForUnknownId() {
-        when(auctionRepositoryPort.findById("missing")).thenReturn(Optional.empty());
+        when(auctionRepositoryPort.findByIdForUpdate("missing")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCase.update("missing", new BigDecimal("150.00"),
                 new BigDecimal("15.00"), Instant.now(), Instant.now().plus(1, ChronoUnit.HOURS), "seller-1"))

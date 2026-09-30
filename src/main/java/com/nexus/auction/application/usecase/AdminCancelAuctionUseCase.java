@@ -21,7 +21,7 @@ public class AdminCancelAuctionUseCase {
 
     @Transactional
     public AuctionResult cancel(String id, String callerId) {
-        Auction existing = auctionRepositoryPort.findById(id).orElseThrow(() -> new AuctionNotFoundException(id));
+        Auction existing = auctionRepositoryPort.findByIdForUpdate(id).orElseThrow(() -> new AuctionNotFoundException(id));
         if (existing.getStatus() == AuctionStatus.ENDED || existing.getStatus() == AuctionStatus.CANCELLED) {
             throw new ConflictException("AUCTION_NOT_CANCELLABLE",
                     "Cannot cancel an auction that has already ended or been cancelled: " + id);

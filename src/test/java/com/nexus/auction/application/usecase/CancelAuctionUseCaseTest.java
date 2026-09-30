@@ -31,6 +31,10 @@ class CancelAuctionUseCaseTest {
         eventPublisherPort = mock(EventPublisherPort.class);
         useCase = new CancelAuctionUseCase(auctionRepositoryPort, eventPublisherPort);
         when(auctionRepositoryPort.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+        // Poison pill: cancel() must use the locked read (findByIdForUpdate), never the
+        // unlocked one, or a concurrent bid/settlement could be silently overwritten.
+        when(auctionRepositoryPort.findById(any())).thenThrow(new AssertionError(
+                "CancelAuctionUseCase must call findByIdForUpdate, not findById"));
     }
 
     private Auction newAuction() {
@@ -42,7 +46,7 @@ class CancelAuctionUseCaseTest {
     @Test
     void cancel_allowsSellerToCancelWhilePending() {
         Auction auction = newAuction();
-        when(auctionRepositoryPort.findById(auction.getId())).thenReturn(Optional.of(auction));
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
 
         AuctionResult result = useCase.cancel(auction.getId(), "seller-1");
 
@@ -53,7 +57,7 @@ class CancelAuctionUseCaseTest {
     @Test
     void cancel_allowsSellerToCancelWhileActiveWithZeroBids() {
         Auction auction = newAuction().withStatus(AuctionStatus.ACTIVE);
-        when(auctionRepositoryPort.findById(auction.getId())).thenReturn(Optional.of(auction));
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
 
         AuctionResult result = useCase.cancel(auction.getId(), "seller-1");
 
@@ -63,7 +67,7 @@ class CancelAuctionUseCaseTest {
     @Test
     void cancel_rejectsSellerOnceAuctionHasABid() {
         Auction auction = newAuction().withStatus(AuctionStatus.ACTIVE).withBid("bidder-1", new BigDecimal("100.00"));
-        when(auctionRepositoryPort.findById(auction.getId())).thenReturn(Optional.of(auction));
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
 
         assertThatThrownBy(() -> useCase.cancel(auction.getId(), "seller-1"))
                 .isInstanceOf(ConflictException.class);
@@ -72,7 +76,7 @@ class CancelAuctionUseCaseTest {
     @Test
     void cancel_rejectsNonOwner() {
         Auction auction = newAuction();
-        when(auctionRepositoryPort.findById(auction.getId())).thenReturn(Optional.of(auction));
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
 
         assertThatThrownBy(() -> useCase.cancel(auction.getId(), "other-seller"))
                 .isInstanceOf(ForbiddenException.class);
