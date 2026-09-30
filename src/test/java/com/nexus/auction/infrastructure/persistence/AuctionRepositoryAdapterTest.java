@@ -18,7 +18,10 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
+import com.nexus.common.core.exception.ConflictException;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers
 @DataJpaTest
@@ -95,5 +98,21 @@ class AuctionRepositoryAdapterTest {
     @Test
     void findById_returnsEmptyForMalformedId() {
         assertThat(adapter.findById("not-a-uuid")).isEmpty();
+    }
+
+    @Test
+    void save_rejectsASecondPendingOrActiveAuctionForTheSameProduct() {
+        // CreateAuctionUseCase already check-then-inserts (existsActiveOrPendingForProduct
+        // then save), but that is a TOCTOU race under concurrent requests. The DB-level
+        // partial unique index is the actual guarantee; this proves it exists and that the
+        // adapter maps the resulting constraint violation to a domain ConflictException
+        // rather than letting a raw DataIntegrityViolationException escape as a 500.
+        Auction first = newAuction();
+        adapter.save(first);
+        Auction second = Auction.create(first.getProductId(), "seller-2",
+                new BigDecimal("200.00"), new BigDecimal("20.00"),
+                Instant.now(), Instant.now().plus(2, ChronoUnit.HOURS));
+
+        assertThatThrownBy(() -> adapter.save(second)).isInstanceOf(ConflictException.class);
     }
 }

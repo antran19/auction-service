@@ -4,6 +4,8 @@ import com.nexus.auction.application.port.out.AuctionRepositoryPort;
 import com.nexus.auction.domain.model.Auction;
 import com.nexus.auction.domain.model.AuctionStatus;
 import com.nexus.auction.infrastructure.persistence.entity.AuctionJpaEntity;
+import com.nexus.common.core.exception.ConflictException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -26,7 +28,22 @@ public class AuctionRepositoryAdapter implements AuctionRepositoryPort {
     @Override
     public Auction save(Auction auction) {
         AuctionJpaEntity entity = toEntity(auction);
-        jpaRepository.save(entity);
+        try {
+            jpaRepository.save(entity);
+            // Without an explicit flush, Hibernate can defer the actual INSERT past this
+            // method returning (to the enclosing @Transactional method's commit) — by then
+            // this try/catch is out of scope and the constraint violation would surface
+            // as a late, untranslated commit-time failure instead of the ConflictException
+            // below.
+            jpaRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            // Translates the partial unique index violation (V4 migration) into the same
+            // domain error CreateAuctionUseCase's own check-then-insert already throws for
+            // the non-racing case, instead of letting a raw persistence exception surface
+            // as an unmapped 500.
+            throw new ConflictException("PRODUCT_ALREADY_IN_AUCTION",
+                    "Product already has an active or pending auction: " + auction.getProductId());
+        }
         return auction;
     }
 
