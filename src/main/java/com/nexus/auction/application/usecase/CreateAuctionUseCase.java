@@ -10,12 +10,13 @@ import com.nexus.common.events.AuctionCreatedEvent;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 
 public class CreateAuctionUseCase {
 
-    private static final long MIN_DURATION_MINUTES = 60;
-    private static final long MAX_DURATION_HOURS = 168;
+    static final long MIN_DURATION_MINUTES = 60;
+    static final long MAX_DURATION_HOURS = 168;
     private static final int MAX_ACTIVE_AUCTIONS_PER_SELLER = 5;
 
     private final AuctionRepositoryPort auctionRepositoryPort;
@@ -28,7 +29,7 @@ public class CreateAuctionUseCase {
 
     @Transactional
     public AuctionResult create(CreateAuctionCommand command) {
-        validateWindow(command);
+        validateWindow(command.startTime(), command.endTime());
 
         if (auctionRepositoryPort.existsActiveOrPendingForProduct(command.productId())) {
             throw new ConflictException("PRODUCT_ALREADY_IN_AUCTION",
@@ -48,12 +49,15 @@ public class CreateAuctionUseCase {
         return toResult(saved);
     }
 
-    private void validateWindow(CreateAuctionCommand command) {
-        if (!command.startTime().isBefore(command.endTime())) {
+    // Package-private (not private) so UpdateAuctionUseCase — same package — reuses the
+    // exact same duration bounds. A seller updating an auction's time window must be held
+    // to the same rules as creating one, or update() becomes a way to bypass them.
+    static void validateWindow(Instant startTime, Instant endTime) {
+        if (!startTime.isBefore(endTime)) {
             throw new ValidationException(List.of(
                     new FieldError("endTime", "endTime must be after startTime")));
         }
-        Duration duration = Duration.between(command.startTime(), command.endTime());
+        Duration duration = Duration.between(startTime, endTime);
         if (duration.toMinutes() < MIN_DURATION_MINUTES) {
             throw new ValidationException(List.of(new FieldError("endTime",
                     "Auction duration must be at least " + MIN_DURATION_MINUTES + " minutes")));

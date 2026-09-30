@@ -6,6 +6,7 @@ import com.nexus.auction.domain.model.Auction;
 import com.nexus.auction.domain.model.AuctionStatus;
 import com.nexus.common.core.exception.ConflictException;
 import com.nexus.common.core.exception.ForbiddenException;
+import com.nexus.common.core.exception.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -84,5 +85,42 @@ class UpdateAuctionUseCaseTest {
         assertThatThrownBy(() -> useCase.update("missing", new BigDecimal("150.00"),
                 new BigDecimal("15.00"), Instant.now(), Instant.now().plus(1, ChronoUnit.HOURS), "seller-1"))
                 .isInstanceOf(AuctionNotFoundException.class);
+    }
+
+    // --- Fix-pass additions (2026-09-30 final review): update() must re-validate the
+    // same duration window CreateAuctionUseCase enforces, or a seller can update a valid
+    // auction into an invalid one (end before start, too short, too long). ---
+
+    @Test
+    void update_rejectsEndTimeBeforeStartTime() {
+        Auction auction = pendingAuction();
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
+        Instant start = Instant.now().plus(1, ChronoUnit.HOURS);
+
+        assertThatThrownBy(() -> useCase.update(auction.getId(), new BigDecimal("150.00"), new BigDecimal("15.00"),
+                start, start.minus(1, ChronoUnit.HOURS), "seller-1"))
+                .isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    void update_rejectsDurationBelowMinimum() {
+        Auction auction = pendingAuction();
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
+        Instant start = Instant.now().plus(1, ChronoUnit.HOURS);
+
+        assertThatThrownBy(() -> useCase.update(auction.getId(), new BigDecimal("150.00"), new BigDecimal("15.00"),
+                start, start.plus(30, ChronoUnit.MINUTES), "seller-1"))
+                .isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    void update_rejectsDurationAboveMaximum() {
+        Auction auction = pendingAuction();
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
+        Instant start = Instant.now().plus(1, ChronoUnit.HOURS);
+
+        assertThatThrownBy(() -> useCase.update(auction.getId(), new BigDecimal("150.00"), new BigDecimal("15.00"),
+                start, start.plus(169, ChronoUnit.HOURS), "seller-1"))
+                .isInstanceOf(ValidationException.class);
     }
 }

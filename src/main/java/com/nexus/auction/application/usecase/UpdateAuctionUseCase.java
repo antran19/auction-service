@@ -21,6 +21,8 @@ public class UpdateAuctionUseCase {
     @Transactional
     public AuctionResult update(String id, BigDecimal startingPrice, BigDecimal bidIncrement,
                                  Instant startTime, Instant endTime, String callerId) {
+        CreateAuctionUseCase.validateWindow(startTime, endTime);
+
         Auction existing = auctionRepositoryPort.findByIdForUpdate(id).orElseThrow(() -> new AuctionNotFoundException(id));
         AuctionOwnershipPolicy.requireOwner(existing, callerId);
         if (existing.getStatus() != AuctionStatus.PENDING) {
