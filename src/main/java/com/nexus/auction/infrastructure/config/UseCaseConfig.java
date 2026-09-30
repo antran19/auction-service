@@ -6,6 +6,9 @@ import com.nexus.auction.application.usecase.AdminCancelAuctionUseCase;
 import com.nexus.auction.application.usecase.CancelAuctionUseCase;
 import com.nexus.auction.application.port.out.BidRepositoryPort;
 import com.nexus.auction.application.usecase.CreateAuctionUseCase;
+import com.nexus.auction.application.usecase.GetAuctionUseCase;
+import com.nexus.auction.application.usecase.GetBidHistoryUseCase;
+import com.nexus.auction.application.usecase.ListAuctionsUseCase;
 import com.nexus.auction.application.usecase.PlaceBidUseCase;
 import com.nexus.auction.application.usecase.UpdateAuctionUseCase;
 import org.springframework.context.annotation.Bean;
@@ -41,5 +44,20 @@ public class UseCaseConfig {
     public PlaceBidUseCase placeBidUseCase(AuctionRepositoryPort auctionPort, BidRepositoryPort bidPort,
                                             EventPublisherPort eventPublisherPort) {
         return new PlaceBidUseCase(auctionPort, bidPort, eventPublisherPort);
+    }
+
+    @Bean
+    public GetAuctionUseCase getAuctionUseCase(AuctionRepositoryPort auctionPort) {
+        return new GetAuctionUseCase(auctionPort);
+    }
+
+    @Bean
+    public ListAuctionsUseCase listAuctionsUseCase(AuctionRepositoryPort auctionPort) {
+        return new ListAuctionsUseCase(auctionPort);
+    }
+
+    @Bean
+    public GetBidHistoryUseCase getBidHistoryUseCase(BidRepositoryPort bidPort) {
+        return new GetBidHistoryUseCase(bidPort);
     }
 }
