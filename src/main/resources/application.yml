@@ -20,6 +20,22 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        # Default is 60000ms. OutboxRelayJob, AuctionLifecycleJob and PaymentDeadlineJob
+        # all share Spring's single-threaded default @Scheduled pool (see
+        # spring.task.scheduling below) — if Kafka is unreachable, each of up to 50 pending
+        # outbox rows would otherwise block the shared thread for up to 60s on producer
+        # metadata alone before OutboxRelayJob's own 5s .get() timeout even starts, starving
+        # the lifecycle/payment-deadline jobs and letting bids keep landing on auctions that
+        # should have already ended.
+        max.block.ms: 5000
+  task:
+    scheduling:
+      pool:
+        # One thread per @Scheduled job (OutboxRelayJob, AuctionLifecycleJob,
+        # PaymentDeadlineJob) so a slow or blocked one — a Kafka outage above all — cannot
+        # starve the other two.
+        size: 3
 
 eureka:
   client:
