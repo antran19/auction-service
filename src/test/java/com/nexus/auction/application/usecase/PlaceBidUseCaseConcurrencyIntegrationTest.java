@@ -1,6 +1,7 @@
 package com.nexus.auction.application.usecase;
 
 import com.nexus.auction.application.port.out.AuctionRepositoryPort;
+import com.nexus.common.core.exception.ValidationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -58,6 +59,7 @@ class PlaceBidUseCaseConcurrencyIntegrationTest {
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
         CountDownLatch startGate = new CountDownLatch(1);
         AtomicInteger successCount = new AtomicInteger();
+        List<Throwable> unexpectedFailures = new CopyOnWriteArrayList<>();
         List<Future<?>> futures = new java.util.ArrayList<>();
 
         for (int i = 0; i < threadCount; i++) {
@@ -69,8 +71,15 @@ class PlaceBidUseCaseConcurrencyIntegrationTest {
                     successCount.incrementAndGet();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                } catch (Exception ignoredValidationOrConflict) {
-                    // Expected for every thread except the one that wins the race.
+                } catch (ValidationException expectedForEveryLosingBidder) {
+                    // All 20 threads bid the SAME amount; the moment one commits, every
+                    // other thread re-reads under the lock and finds that amount no longer
+                    // strictly above the new highest bid — a ValidationException, not any
+                    // other exception type. Anything else here (a lock timeout, a DB error,
+                    // ConflictException from a status/end-time check that shouldn't apply
+                    // to an ACTIVE auction) is a real problem this test must not swallow.
+                } catch (Exception unexpected) {
+                    unexpectedFailures.add(unexpected);
                 }
             }));
         }
@@ -80,6 +89,9 @@ class PlaceBidUseCaseConcurrencyIntegrationTest {
         }
         executor.shutdown();
 
+        assertThat(unexpectedFailures)
+                .as("every losing bidder must fail with ValidationException specifically, nothing else")
+                .isEmpty();
         assertThat(successCount.get())
                 .as("exactly one of the identical concurrent bids must be accepted")
                 .isEqualTo(1);

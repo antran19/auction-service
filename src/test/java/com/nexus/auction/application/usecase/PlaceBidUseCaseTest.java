@@ -108,4 +108,37 @@ class PlaceBidUseCaseTest {
         assertThatThrownBy(() -> useCase.placeBid("missing", "bidder-1", new BigDecimal("100.00")))
                 .isInstanceOf(AuctionNotFoundException.class);
     }
+
+    // --- Fix-pass addition (2026-09-30 final review): AntiSnipingPolicy was only tested
+    // in isolation (AntiSnipingPolicyTest) — nothing proved PlaceBidUseCase actually calls
+    // it and applies the result. Removing the tryExtend call from PlaceBidUseCase would
+    // have broken no existing test. ---
+
+    @Test
+    void placeBid_extendsEndTimeWhenBidArrivesWithinTheAntiSnipingWindow() {
+        Instant now = Instant.now();
+        Auction auction = Auction.create("product-1", "seller-1", new BigDecimal("100.00"), new BigDecimal("10.00"),
+                        now.minus(1, ChronoUnit.HOURS), now.plus(3, ChronoUnit.MINUTES))
+                .withStatus(AuctionStatus.ACTIVE);
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
+
+        useCase.placeBid(auction.getId(), "bidder-1", new BigDecimal("100.00"));
+
+        verify(auctionRepositoryPort).save(argThat(a ->
+                a.getExtensionCount() == 1 && a.getEndTime().isAfter(auction.getEndTime())));
+    }
+
+    @Test
+    void placeBid_doesNotExtendEndTimeWhenBidArrivesOutsideTheAntiSnipingWindow() {
+        Instant now = Instant.now();
+        Auction auction = Auction.create("product-1", "seller-1", new BigDecimal("100.00"), new BigDecimal("10.00"),
+                        now.minus(1, ChronoUnit.HOURS), now.plus(1, ChronoUnit.HOURS))
+                .withStatus(AuctionStatus.ACTIVE);
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
+
+        useCase.placeBid(auction.getId(), "bidder-1", new BigDecimal("100.00"));
+
+        verify(auctionRepositoryPort).save(argThat(a ->
+                a.getExtensionCount() == 0 && a.getEndTime().equals(auction.getEndTime())));
+    }
 }
