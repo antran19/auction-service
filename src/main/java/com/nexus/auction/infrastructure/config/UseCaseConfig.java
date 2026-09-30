@@ -6,6 +6,7 @@ import com.nexus.auction.application.usecase.AdminCancelAuctionUseCase;
 import com.nexus.auction.application.usecase.CancelAuctionUseCase;
 import com.nexus.auction.application.port.out.BidRepositoryPort;
 import com.nexus.auction.application.usecase.CreateAuctionUseCase;
+import com.nexus.auction.application.usecase.EmitPaymentTimeoutUseCase;
 import com.nexus.auction.application.usecase.EndAuctionUseCase;
 import com.nexus.auction.application.usecase.GetAuctionUseCase;
 import com.nexus.auction.application.usecase.GetBidHistoryUseCase;
@@ -73,5 +74,11 @@ public class UseCaseConfig {
     public EndAuctionUseCase endAuctionUseCase(AuctionRepositoryPort auctionPort,
                                                 EventPublisherPort eventPublisherPort) {
         return new EndAuctionUseCase(auctionPort, eventPublisherPort);
+    }
+
+    @Bean
+    public EmitPaymentTimeoutUseCase emitPaymentTimeoutUseCase(AuctionRepositoryPort auctionPort,
+                                                                 EventPublisherPort eventPublisherPort) {
+        return new EmitPaymentTimeoutUseCase(auctionPort, eventPublisherPort);
     }
 }
