@@ -19,6 +19,7 @@
     <spring-cloud.version>2023.0.3</spring-cloud.version>
     <mapstruct.version>1.6.2</mapstruct.version>
     <testcontainers.version>1.20.1</testcontainers.version>
+    <springdoc.version>2.6.0</springdoc.version>
     <!-- Version of the com.nexus:common-* artifacts published by the sibling
          common-libs project (install locally with: cd ../common-libs && mvn clean install).
          1.1.0, not 1.0.0 — this service is the first consumer of the Auction domain events
@@ -92,6 +93,11 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+      <version>${springdoc.version}</version>
     </dependency>
     <dependency>
       <groupId>org.springframework.cloud</groupId>
