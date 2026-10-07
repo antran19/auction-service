@@ -24,7 +24,7 @@
          common-libs project (install locally with: cd ../common-libs && mvn clean install).
          1.1.0, not 1.0.0 — this service is the first consumer of the Auction domain events
          common-libs adds at that version. -->
-    <common-libs.version>1.1.0</common-libs.version>
+    <common-libs.version>1.2.0</common-libs.version>
   </properties>
 
   <dependencyManagement>
@@ -124,11 +124,6 @@
       <groupId>org.mapstruct</groupId>
       <artifactId>mapstruct</artifactId>
       <version>${mapstruct.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>com.stripe</groupId>
-      <artifactId>stripe-java</artifactId>
-      <version>24.21.0</version>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>

@@ -29,6 +29,11 @@ spring:
         # the lifecycle/payment-deadline jobs and letting bids keep landing on auctions that
         # should have already ended.
         max.block.ms: 5000
+    consumer:
+      group-id: auction-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
   task:
     scheduling:
       pool:
@@ -49,9 +54,6 @@ nexus:
     jwt:
       secret: "dev-only-secret-key-change-in-production-min-256-bits-long!!"
       expiration-minutes: 60
-  payment:
-    stripe:
-      secret-key: ${STRIPE_SECRET_KEY:}
 
 management:
   endpoints:
