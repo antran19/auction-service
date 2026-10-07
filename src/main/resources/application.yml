@@ -49,6 +49,9 @@ nexus:
     jwt:
       secret: "dev-only-secret-key-change-in-production-min-256-bits-long!!"
       expiration-minutes: 60
+  payment:
+    stripe:
+      secret-key: ${STRIPE_SECRET_KEY:}
 
 management:
   endpoints:

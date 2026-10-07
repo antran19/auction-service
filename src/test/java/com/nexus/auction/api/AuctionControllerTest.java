@@ -56,7 +56,7 @@ class AuctionControllerTest {
         Instant start = Instant.now().plus(1, ChronoUnit.HOURS);
         return new AuctionResult("auction-id", "product-1", sellerId, new BigDecimal("100.00"),
                 new BigDecimal("10.00"), null, null, "PENDING", start, start.plus(2, ChronoUnit.HOURS), 0,
-                null, null, null);
+                null, null, null, null);
     }
 
     @Test

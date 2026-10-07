@@ -55,6 +55,9 @@ public class AuctionJpaEntity {
     @Column(name = "payment_timeout_emitted", nullable = false)
     private boolean paymentTimeoutEmitted;
 
+    @Column(name = "paid_at")
+    private Instant paidAt;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -68,7 +71,7 @@ public class AuctionJpaEntity {
                              BigDecimal bidIncrement, BigDecimal currentHighestBid, String currentHighestBidderId,
                              String status, Instant startTime, Instant endTime, int extensionCount, String winnerId,
                              BigDecimal finalPrice, Instant paymentDeadline, boolean paymentTimeoutEmitted,
-                             Instant createdAt, Instant updatedAt) {
+                             Instant paidAt, Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.productId = productId;
         this.sellerId = sellerId;
@@ -84,6 +87,7 @@ public class AuctionJpaEntity {
         this.finalPrice = finalPrice;
         this.paymentDeadline = paymentDeadline;
         this.paymentTimeoutEmitted = paymentTimeoutEmitted;
+        this.paidAt = paidAt;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -103,6 +107,7 @@ public class AuctionJpaEntity {
     public BigDecimal getFinalPrice() { return finalPrice; }
     public Instant getPaymentDeadline() { return paymentDeadline; }
     public boolean isPaymentTimeoutEmitted() { return paymentTimeoutEmitted; }
+    public Instant getPaidAt() { return paidAt; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

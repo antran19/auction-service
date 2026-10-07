@@ -98,7 +98,8 @@ public class AuctionRepositoryAdapter implements AuctionRepositoryPort {
         return new AuctionJpaEntity(UUID.fromString(a.getId()), UUID.fromString(a.getProductId()), a.getSellerId(),
                 a.getStartingPrice(), a.getBidIncrement(), a.getCurrentHighestBid(), a.getCurrentHighestBidderId(),
                 a.getStatus().name(), a.getStartTime(), a.getEndTime(), a.getExtensionCount(), a.getWinnerId(),
-                a.getFinalPrice(), a.getPaymentDeadline(), a.isPaymentTimeoutEmitted(), a.getCreatedAt(), a.getUpdatedAt());
+                a.getFinalPrice(), a.getPaymentDeadline(), a.isPaymentTimeoutEmitted(), a.getPaidAt(),
+                a.getCreatedAt(), a.getUpdatedAt());
     }
 
     private Auction toDomain(AuctionJpaEntity e) {
@@ -106,6 +107,6 @@ public class AuctionRepositoryAdapter implements AuctionRepositoryPort {
                 e.getStartingPrice(), e.getBidIncrement(), e.getCurrentHighestBid(), e.getCurrentHighestBidderId(),
                 AuctionStatus.valueOf(e.getStatus()), e.getStartTime(), e.getEndTime(), e.getExtensionCount(),
                 e.getWinnerId(), e.getFinalPrice(), e.getPaymentDeadline(), e.isPaymentTimeoutEmitted(),
-                e.getCreatedAt(), e.getUpdatedAt());
+                e.getPaidAt(), e.getCreatedAt(), e.getUpdatedAt());
     }
 }

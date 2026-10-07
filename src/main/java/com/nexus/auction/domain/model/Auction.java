@@ -21,6 +21,7 @@ public class Auction {
     private final BigDecimal finalPrice;
     private final Instant paymentDeadline;
     private final boolean paymentTimeoutEmitted;
+    private final Instant paidAt;
     private final Instant createdAt;
     private final Instant updatedAt;
 
@@ -28,7 +29,7 @@ public class Auction {
                      BigDecimal bidIncrement, BigDecimal currentHighestBid, String currentHighestBidderId,
                      AuctionStatus status, Instant startTime, Instant endTime, int extensionCount,
                      String winnerId, BigDecimal finalPrice, Instant paymentDeadline,
-                     boolean paymentTimeoutEmitted, Instant createdAt, Instant updatedAt) {
+                     boolean paymentTimeoutEmitted, Instant paidAt, Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.productId = productId;
         this.sellerId = sellerId;
@@ -44,6 +45,7 @@ public class Auction {
         this.finalPrice = finalPrice;
         this.paymentDeadline = paymentDeadline;
         this.paymentTimeoutEmitted = paymentTimeoutEmitted;
+        this.paidAt = paidAt;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -52,55 +54,61 @@ public class Auction {
                                   BigDecimal bidIncrement, Instant startTime, Instant endTime) {
         Instant now = Instant.now();
         return new Auction(UUID.randomUUID().toString(), productId, sellerId, startingPrice, bidIncrement,
-                null, null, AuctionStatus.PENDING, startTime, endTime, 0, null, null, null, false, now, now);
+                null, null, AuctionStatus.PENDING, startTime, endTime, 0, null, null, null, false, null, now, now);
     }
 
     public static Auction reconstitute(String id, String productId, String sellerId, BigDecimal startingPrice,
                                         BigDecimal bidIncrement, BigDecimal currentHighestBid,
                                         String currentHighestBidderId, AuctionStatus status, Instant startTime,
                                         Instant endTime, int extensionCount, String winnerId, BigDecimal finalPrice,
-                                        Instant paymentDeadline, boolean paymentTimeoutEmitted, Instant createdAt,
-                                        Instant updatedAt) {
+                                        Instant paymentDeadline, boolean paymentTimeoutEmitted, Instant paidAt,
+                                        Instant createdAt, Instant updatedAt) {
         return new Auction(id, productId, sellerId, startingPrice, bidIncrement, currentHighestBid,
                 currentHighestBidderId, status, startTime, endTime, extensionCount, winnerId, finalPrice,
-                paymentDeadline, paymentTimeoutEmitted, createdAt, updatedAt);
+                paymentDeadline, paymentTimeoutEmitted, paidAt, createdAt, updatedAt);
     }
 
     public Auction withStatus(AuctionStatus newStatus) {
         return new Auction(id, productId, sellerId, startingPrice, bidIncrement, currentHighestBid,
                 currentHighestBidderId, newStatus, startTime, endTime, extensionCount, winnerId, finalPrice,
-                paymentDeadline, paymentTimeoutEmitted, createdAt, Instant.now());
+                paymentDeadline, paymentTimeoutEmitted, paidAt, createdAt, Instant.now());
     }
 
     public Auction withDetails(BigDecimal newStartingPrice, BigDecimal newBidIncrement,
                                 Instant newStartTime, Instant newEndTime) {
         return new Auction(id, productId, sellerId, newStartingPrice, newBidIncrement, currentHighestBid,
                 currentHighestBidderId, status, newStartTime, newEndTime, extensionCount, winnerId, finalPrice,
-                paymentDeadline, paymentTimeoutEmitted, createdAt, Instant.now());
+                paymentDeadline, paymentTimeoutEmitted, paidAt, createdAt, Instant.now());
     }
 
     public Auction withBid(String bidderId, BigDecimal amount) {
         return new Auction(id, productId, sellerId, startingPrice, bidIncrement, amount, bidderId,
                 status, startTime, endTime, extensionCount, winnerId, finalPrice, paymentDeadline,
-                paymentTimeoutEmitted, createdAt, Instant.now());
+                paymentTimeoutEmitted, paidAt, createdAt, Instant.now());
     }
 
     public Auction withExtendedEndTime(Instant newEndTime) {
         return new Auction(id, productId, sellerId, startingPrice, bidIncrement, currentHighestBid,
                 currentHighestBidderId, status, startTime, newEndTime, extensionCount + 1, winnerId, finalPrice,
-                paymentDeadline, paymentTimeoutEmitted, createdAt, Instant.now());
+                paymentDeadline, paymentTimeoutEmitted, paidAt, createdAt, Instant.now());
     }
 
     public Auction withSettlement(String newWinnerId, BigDecimal newFinalPrice, Instant newPaymentDeadline) {
         return new Auction(id, productId, sellerId, startingPrice, bidIncrement, currentHighestBid,
                 currentHighestBidderId, AuctionStatus.ENDED, startTime, endTime, extensionCount, newWinnerId,
-                newFinalPrice, newPaymentDeadline, paymentTimeoutEmitted, createdAt, Instant.now());
+                newFinalPrice, newPaymentDeadline, paymentTimeoutEmitted, paidAt, createdAt, Instant.now());
     }
 
     public Auction withPaymentTimeoutEmitted() {
         return new Auction(id, productId, sellerId, startingPrice, bidIncrement, currentHighestBid,
                 currentHighestBidderId, status, startTime, endTime, extensionCount, winnerId, finalPrice,
-                paymentDeadline, true, createdAt, Instant.now());
+                paymentDeadline, true, paidAt, createdAt, Instant.now());
+    }
+
+    public Auction markPaid(Instant paidAt) {
+        return new Auction(id, productId, sellerId, startingPrice, bidIncrement, currentHighestBid,
+                currentHighestBidderId, status, startTime, endTime, extensionCount, winnerId, finalPrice,
+                paymentDeadline, paymentTimeoutEmitted, paidAt, createdAt, Instant.now());
     }
 
     public String getId() { return id; }
@@ -118,6 +126,7 @@ public class Auction {
     public BigDecimal getFinalPrice() { return finalPrice; }
     public Instant getPaymentDeadline() { return paymentDeadline; }
     public boolean isPaymentTimeoutEmitted() { return paymentTimeoutEmitted; }
+    public Instant getPaidAt() { return paidAt; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

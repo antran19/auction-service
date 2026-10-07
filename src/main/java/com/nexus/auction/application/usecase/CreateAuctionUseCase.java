@@ -72,6 +72,6 @@ public class CreateAuctionUseCase {
         return new AuctionResult(a.getId(), a.getProductId(), a.getSellerId(), a.getStartingPrice(),
                 a.getBidIncrement(), a.getCurrentHighestBid(), a.getCurrentHighestBidderId(), a.getStatus().name(),
                 a.getStartTime(), a.getEndTime(), a.getExtensionCount(), a.getWinnerId(), a.getFinalPrice(),
-                a.getPaymentDeadline());
+                a.getPaymentDeadline(), a.getPaidAt());
     }
 }

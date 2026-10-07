@@ -2,10 +2,13 @@ package com.nexus.auction.infrastructure.config;
 
 import com.nexus.auction.application.port.out.AuctionRepositoryPort;
 import com.nexus.auction.application.port.out.EventPublisherPort;
+import com.nexus.auction.application.port.out.PaymentGatewayPort;
 import com.nexus.auction.application.usecase.AdminCancelAuctionUseCase;
 import com.nexus.auction.application.usecase.CancelAuctionUseCase;
 import com.nexus.auction.application.port.out.BidRepositoryPort;
+import com.nexus.auction.application.usecase.ConfirmPaymentUseCase;
 import com.nexus.auction.application.usecase.CreateAuctionUseCase;
+import com.nexus.auction.application.usecase.CreateCheckoutSessionUseCase;
 import com.nexus.auction.application.usecase.EmitPaymentTimeoutUseCase;
 import com.nexus.auction.application.usecase.EndAuctionUseCase;
 import com.nexus.auction.application.usecase.GetAuctionUseCase;
@@ -80,5 +83,17 @@ public class UseCaseConfig {
     public EmitPaymentTimeoutUseCase emitPaymentTimeoutUseCase(AuctionRepositoryPort auctionPort,
                                                                  EventPublisherPort eventPublisherPort) {
         return new EmitPaymentTimeoutUseCase(auctionPort, eventPublisherPort);
+    }
+
+    @Bean
+    public CreateCheckoutSessionUseCase createCheckoutSessionUseCase(AuctionRepositoryPort auctionPort,
+                                                                       PaymentGatewayPort paymentGatewayPort) {
+        return new CreateCheckoutSessionUseCase(auctionPort, paymentGatewayPort);
+    }
+
+    @Bean
+    public ConfirmPaymentUseCase confirmPaymentUseCase(AuctionRepositoryPort auctionPort,
+                                                         PaymentGatewayPort paymentGatewayPort) {
+        return new ConfirmPaymentUseCase(auctionPort, paymentGatewayPort);
     }
 }
