@@ -21,8 +21,12 @@ public class EmitPaymentTimeoutUseCase {
         Auction auction = auctionRepositoryPort.findByIdForUpdate(auctionId).orElse(null);
         // The payment_timeout_emitted flag (checked again here, under the lock, not just in the
         // job's list query) is what makes this safe to call twice for the same auction across
-        // overlapping poll ticks: once true, this is a no-op forever.
-        if (auction == null || auction.isPaymentTimeoutEmitted() || auction.getWinnerId() == null) {
+        // overlapping poll ticks: once true, this is a no-op forever. paidAt is checked for the
+        // same reason the list query filters it too: a winner who paid within the deadline must
+        // never be flagged as a timeout just because this job tick runs after paidAt was set but
+        // the row hadn't been excluded from an already-fetched batch.
+        if (auction == null || auction.isPaymentTimeoutEmitted() || auction.getWinnerId() == null
+                || auction.getPaidAt() != null) {
             return;
         }
 

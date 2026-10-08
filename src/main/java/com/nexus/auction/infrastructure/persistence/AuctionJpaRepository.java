@@ -41,6 +41,9 @@ public interface AuctionJpaRepository extends JpaRepository<AuctionJpaEntity, UU
 
     List<AuctionJpaEntity> findByStatusAndEndTimeLessThanEqual(String status, Instant now);
 
-    List<AuctionJpaEntity> findByStatusAndWinnerIdIsNotNullAndPaymentTimeoutEmittedFalseAndPaymentDeadlineLessThanEqual(
+    // PaidAtIsNull: a winner who already paid within the deadline must never surface here, even
+    // if the deadline has since passed -- otherwise a fully-paid auction gets flagged as a
+    // payment timeout.
+    List<AuctionJpaEntity> findByStatusAndWinnerIdIsNotNullAndPaymentTimeoutEmittedFalseAndPaidAtIsNullAndPaymentDeadlineLessThanEqual(
             String status, Instant now);
 }

@@ -90,7 +90,7 @@ public class AuctionRepositoryAdapter implements AuctionRepositoryPort {
 
     @Override
     public List<Auction> findEndedAwaitingPaymentTimeout(Instant now) {
-        return jpaRepository.findByStatusAndWinnerIdIsNotNullAndPaymentTimeoutEmittedFalseAndPaymentDeadlineLessThanEqual(
+        return jpaRepository.findByStatusAndWinnerIdIsNotNullAndPaymentTimeoutEmittedFalseAndPaidAtIsNullAndPaymentDeadlineLessThanEqual(
                 AuctionStatus.ENDED.name(), now).stream().map(this::toDomain).toList();
     }
 

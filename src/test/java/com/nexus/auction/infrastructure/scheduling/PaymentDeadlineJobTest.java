@@ -98,4 +98,28 @@ class PaymentDeadlineJobTest {
 
         assertThat(paymentTimeoutEventCount(id)).isZero();
     }
+
+    // Regression test: a winner who paid within the deadline must never be flagged as a
+    // timeout just because the 24h deadline has since elapsed -- found via live testing,
+    // where an auction paid a day earlier still got penalized once its deadline passed.
+    @Test
+    void run_doesNotEmitForAnAuctionThatWasAlreadyPaid() {
+        UUID id = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO auctions (id, product_id, seller_id, starting_price, bid_increment,
+                                       current_highest_bid, current_highest_bidder_id, status,
+                                       start_time, end_time, winner_id, final_price, payment_deadline,
+                                       payment_timeout_emitted, paid_at)
+                VALUES (?, ?, 'seller-1', 100.00, 10.00, 150.00, 'bidder-1', 'ENDED',
+                        now() - interval '2 hours', now() - interval '1 hour', 'bidder-1', 150.00,
+                        now() - interval '1 minute', false, now() - interval '30 minutes')
+                """, id, UUID.randomUUID());
+
+        job.run();
+
+        Boolean emitted = jdbcTemplate.queryForObject(
+                "SELECT payment_timeout_emitted FROM auctions WHERE id = ?", Boolean.class, id);
+        assertThat(emitted).isFalse();
+        assertThat(paymentTimeoutEventCount(id)).isZero();
+    }
 }

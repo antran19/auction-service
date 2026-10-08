@@ -61,6 +61,17 @@ class EmitPaymentTimeoutUseCaseTest {
     }
 
     @Test
+    void emit_doesNothingWhenAlreadyPaid() {
+        Auction auction = endedAuctionWithWinnerPastDeadline().markPaid(Instant.now());
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
+
+        useCase.emit(auction.getId());
+
+        verify(auctionRepositoryPort, never()).save(any());
+        verifyNoInteractions(eventPublisherPort);
+    }
+
+    @Test
     void emit_doesNothingWhenThereIsNoWinner() {
         Instant now = Instant.now();
         Auction auction = Auction.create("product-1", "seller-1", new BigDecimal("100.00"), new BigDecimal("10.00"),
