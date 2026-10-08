@@ -88,6 +88,28 @@ class AuctionControllerTest {
     }
 
     @Test
+    void create_passesTrustLevelClaimFromTokenIntoCommand() throws Exception {
+        when(jwtTokenProvider.isValid("good-token")).thenReturn(true);
+        Claims claims = Jwts.claims().subject("seller-id").add("privileges", List.of("AUCTION.CREATE"))
+                .add("trustLevel", "NORMAL").build();
+        when(jwtTokenProvider.parseClaims("good-token")).thenReturn(claims);
+        when(createAuctionUseCase.create(any())).thenThrow(
+                new ForbiddenException("INSUFFICIENT_TRUST_TO_CREATE_AUCTION", "too low"));
+
+        mockMvc.perform(post("/api/v1/auctions")
+                        .header("Authorization", "Bearer good-token")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"productId":"product-1","startingPrice":100.00,"bidIncrement":10.00,
+                                 "startTime":"2026-10-01T00:00:00Z","endTime":"2026-10-02T00:00:00Z"}"""))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("INSUFFICIENT_TRUST_TO_CREATE_AUCTION"));
+
+        verify(createAuctionUseCase).create(argThat(
+                (CreateAuctionCommand cmd) -> "NORMAL".equals(cmd.sellerTrustLevel())));
+    }
+
+    @Test
     void cancel_returns403WhenUseCaseRejectsNonOwner() throws Exception {
         authenticateAs("other-seller", "AUCTION.CANCEL");
         when(cancelAuctionUseCase.cancel("a-id", "other-seller"))

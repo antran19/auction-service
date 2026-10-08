@@ -24,7 +24,7 @@
          common-libs project (install locally with: cd ../common-libs && mvn clean install).
          1.1.0, not 1.0.0 — this service is the first consumer of the Auction domain events
          common-libs adds at that version. -->
-    <common-libs.version>1.2.0</common-libs.version>
+    <common-libs.version>1.4.0</common-libs.version>
   </properties>
 
   <dependencyManagement>

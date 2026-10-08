@@ -7,6 +7,7 @@ import com.nexus.auction.api.mapper.AuctionApiMapper;
 import com.nexus.auction.application.usecase.*;
 import com.nexus.common.core.ApiResponse;
 import com.nexus.common.security.RequiresPrivilege;
+import com.nexus.common.security.TokenDetails;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -48,8 +49,9 @@ public class AuctionController {
         // catalog-service's CreateProductUseCase: a client must not create an auction under
         // another seller's identity.
         String sellerId = callerId(authentication);
+        String trustLevel = authentication.getDetails() instanceof TokenDetails details ? details.trustLevel() : null;
         CreateAuctionCommand command = new CreateAuctionCommand(request.productId(), sellerId,
-                request.startingPrice(), request.bidIncrement(), request.startTime(), request.endTime());
+                request.startingPrice(), request.bidIncrement(), request.startTime(), request.endTime(), trustLevel);
         AuctionResult result = createAuctionUseCase.create(command);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(mapper.toResponse(result)));
     }

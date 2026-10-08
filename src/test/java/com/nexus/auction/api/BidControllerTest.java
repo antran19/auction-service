@@ -57,7 +57,7 @@ class BidControllerTest {
         when(jwtTokenProvider.isValid("good-token")).thenReturn(true);
         Claims claims = Jwts.claims().subject("bidder-id").add("privileges", List.of("AUCTION.BID")).build();
         when(jwtTokenProvider.parseClaims("good-token")).thenReturn(claims);
-        when(placeBidUseCase.placeBid("a-id", "bidder-id", new BigDecimal("100.00")))
+        when(placeBidUseCase.placeBid("a-id", "bidder-id", new BigDecimal("100.00"), null))
                 .thenReturn(new BidResult("bid-id", "a-id", "bidder-id", new BigDecimal("100.00"), Instant.now()));
 
         mockMvc.perform(post("/api/v1/auctions/a-id/bids")
@@ -66,6 +66,24 @@ class BidControllerTest {
                         .content("{\"amount\":100.00}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.bidderId").value("bidder-id"));
+    }
+
+    @Test
+    void placeBid_passesTrustLevelClaimFromTokenToUseCase() throws Exception {
+        when(jwtTokenProvider.isValid("good-token")).thenReturn(true);
+        Claims claims = Jwts.claims().subject("bidder-id").add("privileges", List.of("AUCTION.BID"))
+                .add("trustLevel", "LOW").build();
+        when(jwtTokenProvider.parseClaims("good-token")).thenReturn(claims);
+        when(placeBidUseCase.placeBid("a-id", "bidder-id", new BigDecimal("100.00"), "LOW"))
+                .thenThrow(new com.nexus.common.core.exception.ForbiddenException(
+                        "INSUFFICIENT_TRUST_TO_BID", "Your reputation score is too low to place bids"));
+
+        mockMvc.perform(post("/api/v1/auctions/a-id/bids")
+                        .header("Authorization", "Bearer good-token")
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"amount\":100.00}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("INSUFFICIENT_TRUST_TO_BID"));
     }
 
     @Test

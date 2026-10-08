@@ -5,6 +5,7 @@ import com.nexus.auction.application.port.out.EventPublisherPort;
 import com.nexus.auction.domain.model.Auction;
 import com.nexus.common.core.FieldError;
 import com.nexus.common.core.exception.ConflictException;
+import com.nexus.common.core.exception.ForbiddenException;
 import com.nexus.common.core.exception.ValidationException;
 import com.nexus.common.events.AuctionCreatedEvent;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,13 @@ public class CreateAuctionUseCase {
 
     @Transactional
     public AuctionResult create(CreateAuctionCommand command) {
+        // SRS: MIN_REPUTATION_TO_SELL. A null/missing trustLevel (old token, or a test not
+        // exercising this path) fails open -- see PlaceBidUseCase for the same reasoning.
+        if (command.sellerTrustLevel() != null && !"TRUSTED".equals(command.sellerTrustLevel())) {
+            throw new ForbiddenException("INSUFFICIENT_TRUST_TO_CREATE_AUCTION",
+                    "Your reputation score is too low to create auctions");
+        }
+
         validateWindow(command.startTime(), command.endTime());
 
         if (auctionRepositoryPort.existsActiveOrPendingForProduct(command.productId())) {

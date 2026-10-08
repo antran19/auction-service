@@ -8,6 +8,7 @@ import com.nexus.auction.domain.model.Auction;
 import com.nexus.auction.domain.model.AuctionStatus;
 import com.nexus.auction.domain.model.Bid;
 import com.nexus.common.core.exception.ConflictException;
+import com.nexus.common.core.exception.ForbiddenException;
 import com.nexus.common.core.exception.ValidationException;
 import com.nexus.common.events.BidPlacedEvent;
 import com.nexus.common.events.OutbidEvent;
@@ -53,7 +54,7 @@ class PlaceBidUseCaseTest {
         Auction auction = activeAuction();
         when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
 
-        BidResult result = useCase.placeBid(auction.getId(), "bidder-1", new BigDecimal("100.00"));
+        BidResult result = useCase.placeBid(auction.getId(), "bidder-1", new BigDecimal("100.00"), "TRUSTED");
 
         assertThat(result.amount()).isEqualByComparingTo("100.00");
         verify(auctionRepositoryPort).save(argThat(a -> a.getCurrentHighestBidderId().equals("bidder-1")));
@@ -65,7 +66,7 @@ class PlaceBidUseCaseTest {
         Auction auction = activeAuction().withBid("bidder-1", new BigDecimal("100.00"));
         when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
 
-        useCase.placeBid(auction.getId(), "bidder-2", new BigDecimal("110.00"));
+        useCase.placeBid(auction.getId(), "bidder-2", new BigDecimal("110.00"), "TRUSTED");
 
         verify(eventPublisherPort).publish(argThat(event ->
                 event instanceof OutbidEvent outbid && outbid.getOutbidBidderId().equals("bidder-1")));
@@ -76,7 +77,7 @@ class PlaceBidUseCaseTest {
         Auction auction = activeAuction();
         when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
 
-        useCase.placeBid(auction.getId(), "bidder-1", new BigDecimal("100.00"));
+        useCase.placeBid(auction.getId(), "bidder-1", new BigDecimal("100.00"), "TRUSTED");
 
         verify(eventPublisherPort, never()).publish(any(OutbidEvent.class));
     }
@@ -86,7 +87,7 @@ class PlaceBidUseCaseTest {
         Auction auction = activeAuction();
         when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
 
-        assertThatThrownBy(() -> useCase.placeBid(auction.getId(), "bidder-1", new BigDecimal("50.00")))
+        assertThatThrownBy(() -> useCase.placeBid(auction.getId(), "bidder-1", new BigDecimal("50.00"), "TRUSTED"))
                 .isInstanceOf(ValidationException.class);
         verify(bidRepositoryPort, never()).save(any());
     }
@@ -97,7 +98,7 @@ class PlaceBidUseCaseTest {
                 Instant.now().plus(1, ChronoUnit.HOURS), Instant.now().plus(2, ChronoUnit.HOURS));
         when(auctionRepositoryPort.findByIdForUpdate(pending.getId())).thenReturn(Optional.of(pending));
 
-        assertThatThrownBy(() -> useCase.placeBid(pending.getId(), "bidder-1", new BigDecimal("100.00")))
+        assertThatThrownBy(() -> useCase.placeBid(pending.getId(), "bidder-1", new BigDecimal("100.00"), "TRUSTED"))
                 .isInstanceOf(ConflictException.class);
     }
 
@@ -105,7 +106,7 @@ class PlaceBidUseCaseTest {
     void placeBid_throwsNotFoundForUnknownAuction() {
         when(auctionRepositoryPort.findByIdForUpdate("missing")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> useCase.placeBid("missing", "bidder-1", new BigDecimal("100.00")))
+        assertThatThrownBy(() -> useCase.placeBid("missing", "bidder-1", new BigDecimal("100.00"), "TRUSTED"))
                 .isInstanceOf(AuctionNotFoundException.class);
     }
 
@@ -122,7 +123,7 @@ class PlaceBidUseCaseTest {
                 .withStatus(AuctionStatus.ACTIVE);
         when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
 
-        useCase.placeBid(auction.getId(), "bidder-1", new BigDecimal("100.00"));
+        useCase.placeBid(auction.getId(), "bidder-1", new BigDecimal("100.00"), "TRUSTED");
 
         verify(auctionRepositoryPort).save(argThat(a ->
                 a.getExtensionCount() == 1 && a.getEndTime().isAfter(auction.getEndTime())));
@@ -136,9 +137,41 @@ class PlaceBidUseCaseTest {
                 .withStatus(AuctionStatus.ACTIVE);
         when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
 
-        useCase.placeBid(auction.getId(), "bidder-1", new BigDecimal("100.00"));
+        useCase.placeBid(auction.getId(), "bidder-1", new BigDecimal("100.00"), "TRUSTED");
 
         verify(auctionRepositoryPort).save(argThat(a ->
                 a.getExtensionCount() == 0 && a.getEndTime().equals(auction.getEndTime())));
+    }
+
+    @Test
+    void placeBid_rejectsBidderBelowMinReputationToBid() {
+        Auction auction = activeAuction();
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
+
+        assertThatThrownBy(() -> useCase.placeBid(auction.getId(), "bidder-1", new BigDecimal("100.00"), "LOW"))
+                .isInstanceOf(ForbiddenException.class);
+        verify(bidRepositoryPort, never()).save(any());
+    }
+
+    @Test
+    void placeBid_allowsNormalTrustLevelToBid() {
+        Auction auction = activeAuction();
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
+
+        BidResult result = useCase.placeBid(auction.getId(), "bidder-1", new BigDecimal("100.00"), "NORMAL");
+
+        assertThat(result.amount()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void placeBid_allowsBiddingWhenTrustLevelIsMissing() {
+        // A null trustLevel (old token predating the claim) fails open rather than blocking
+        // every bidder.
+        Auction auction = activeAuction();
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
+
+        BidResult result = useCase.placeBid(auction.getId(), "bidder-1", new BigDecimal("100.00"), null);
+
+        assertThat(result.amount()).isEqualByComparingTo("100.00");
     }
 }

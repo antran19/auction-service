@@ -67,7 +67,7 @@ class PlaceBidUseCaseConcurrencyIntegrationTest {
             futures.add(executor.submit(() -> {
                 try {
                     startGate.await();
-                    placeBidUseCase.placeBid(auctionId.toString(), bidderId, contestedAmount);
+                    placeBidUseCase.placeBid(auctionId.toString(), bidderId, contestedAmount, "TRUSTED");
                     successCount.incrementAndGet();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();

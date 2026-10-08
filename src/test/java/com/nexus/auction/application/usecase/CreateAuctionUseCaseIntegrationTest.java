@@ -55,7 +55,7 @@ class CreateAuctionUseCaseIntegrationTest {
         // outbox failure).
         Instant start = Instant.now().plus(1, ChronoUnit.HOURS);
         return new CreateAuctionCommand(UUID.randomUUID().toString(), "seller-1",
-                new BigDecimal("100.00"), new BigDecimal("10.00"), start, start.plus(2, ChronoUnit.HOURS));
+                new BigDecimal("100.00"), new BigDecimal("10.00"), start, start.plus(2, ChronoUnit.HOURS), "TRUSTED");
     }
 
     @Test

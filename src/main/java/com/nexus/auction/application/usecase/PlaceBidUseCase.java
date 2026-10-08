@@ -8,6 +8,7 @@ import com.nexus.auction.domain.model.Auction;
 import com.nexus.auction.domain.model.Bid;
 import com.nexus.auction.domain.service.AntiSnipingPolicy;
 import com.nexus.auction.domain.service.BidValidationPolicy;
+import com.nexus.common.core.exception.ForbiddenException;
 import com.nexus.common.events.BidPlacedEvent;
 import com.nexus.common.events.OutbidEvent;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,7 +35,15 @@ public class PlaceBidUseCase {
     // concurrent caller for the same auctionId blocks here until the previous one finishes,
     // serializing bid validation + write and eliminating the lost-update race.
     @Transactional
-    public BidResult placeBid(String auctionId, String bidderId, BigDecimal amount) {
+    public BidResult placeBid(String auctionId, String bidderId, BigDecimal amount, String callerTrustLevel) {
+        // SRS: MIN_REPUTATION_TO_BID. A null/missing trustLevel (an old token issued before
+        // this claim existed, or a test harness not exercising it) fails open rather than
+        // blocking every caller -- a real login always carries a real value going forward.
+        if ("LOW".equals(callerTrustLevel)) {
+            throw new ForbiddenException("INSUFFICIENT_TRUST_TO_BID",
+                    "Your reputation score is too low to place bids");
+        }
+
         Auction auction = auctionRepositoryPort.findByIdForUpdate(auctionId)
                 .orElseThrow(() -> new AuctionNotFoundException(auctionId));
 

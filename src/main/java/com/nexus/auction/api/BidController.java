@@ -8,6 +8,7 @@ import com.nexus.auction.application.usecase.GetBidHistoryUseCase;
 import com.nexus.auction.application.usecase.PlaceBidUseCase;
 import com.nexus.common.core.ApiResponse;
 import com.nexus.common.security.RequiresPrivilege;
+import com.nexus.common.security.TokenDetails;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -38,7 +39,8 @@ public class BidController {
                                                                 @Valid @RequestBody PlaceBidRequest request) {
         // bidderId MUST come from the JWT — same reasoning as sellerId in AuctionController.
         String bidderId = (String) authentication.getPrincipal();
-        BidResult result = placeBidUseCase.placeBid(auctionId, bidderId, request.amount());
+        String trustLevel = authentication.getDetails() instanceof TokenDetails details ? details.trustLevel() : null;
+        BidResult result = placeBidUseCase.placeBid(auctionId, bidderId, request.amount(), trustLevel);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(mapper.toResponse(result)));
     }
 
