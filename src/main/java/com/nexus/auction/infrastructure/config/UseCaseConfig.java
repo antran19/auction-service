@@ -5,6 +5,7 @@ import com.nexus.auction.application.port.out.EventPublisherPort;
 import com.nexus.auction.application.usecase.AdminCancelAuctionUseCase;
 import com.nexus.auction.application.usecase.CancelAuctionUseCase;
 import com.nexus.auction.application.port.out.BidRepositoryPort;
+import com.nexus.auction.application.usecase.ClosePaymentWithoutPenaltyUseCase;
 import com.nexus.auction.application.usecase.CreateAuctionUseCase;
 import com.nexus.auction.application.usecase.EmitPaymentTimeoutUseCase;
 import com.nexus.auction.application.usecase.EndAuctionUseCase;
@@ -81,6 +82,11 @@ public class UseCaseConfig {
     public EmitPaymentTimeoutUseCase emitPaymentTimeoutUseCase(AuctionRepositoryPort auctionPort,
                                                                  EventPublisherPort eventPublisherPort) {
         return new EmitPaymentTimeoutUseCase(auctionPort, eventPublisherPort);
+    }
+
+    @Bean
+    public ClosePaymentWithoutPenaltyUseCase closePaymentWithoutPenaltyUseCase(AuctionRepositoryPort auctionPort) {
+        return new ClosePaymentWithoutPenaltyUseCase(auctionPort);
     }
 
     @Bean

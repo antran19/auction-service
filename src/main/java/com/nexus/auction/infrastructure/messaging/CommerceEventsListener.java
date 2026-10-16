@@ -1,6 +1,7 @@
 package com.nexus.auction.infrastructure.messaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexus.auction.application.usecase.ClosePaymentWithoutPenaltyUseCase;
 import com.nexus.auction.application.usecase.EmitPaymentTimeoutUseCase;
 import com.nexus.auction.application.usecase.MarkAuctionPaidUseCase;
 import com.nexus.common.events.OrderCancelledEvent;
@@ -21,15 +22,22 @@ public class CommerceEventsListener {
 
     private static final Logger log = LoggerFactory.getLogger(CommerceEventsListener.class);
 
+    // The only cancel reason that is the winner's own choice (commerce's CancelOrderUseCase).
+    // Anything else (e.g. fulfillment couldn't reserve stock) is not their fault.
+    static final String BUYER_REQUESTED = "BUYER_REQUESTED";
+
     private final ObjectMapper objectMapper;
     private final MarkAuctionPaidUseCase markAuctionPaidUseCase;
     private final EmitPaymentTimeoutUseCase emitPaymentTimeoutUseCase;
+    private final ClosePaymentWithoutPenaltyUseCase closePaymentWithoutPenaltyUseCase;
 
     public CommerceEventsListener(ObjectMapper objectMapper, MarkAuctionPaidUseCase markAuctionPaidUseCase,
-                                   EmitPaymentTimeoutUseCase emitPaymentTimeoutUseCase) {
+                                   EmitPaymentTimeoutUseCase emitPaymentTimeoutUseCase,
+                                   ClosePaymentWithoutPenaltyUseCase closePaymentWithoutPenaltyUseCase) {
         this.objectMapper = objectMapper;
         this.markAuctionPaidUseCase = markAuctionPaidUseCase;
         this.emitPaymentTimeoutUseCase = emitPaymentTimeoutUseCase;
+        this.closePaymentWithoutPenaltyUseCase = closePaymentWithoutPenaltyUseCase;
     }
 
     @KafkaListener(topics = "commerce-events")
@@ -45,10 +53,17 @@ public class CommerceEventsListener {
                 // The buyer backed out before the 24h deadline -- no need to wait for
                 // PaymentDeadlineJob to find out; EmitPaymentTimeoutUseCase is already
                 // idempotent, so the job finding this auction too (if it ever raced ahead)
-                // is a harmless no-op.
+                // is a harmless no-op. Any other reason (out of stock, ...) is not the
+                // winner's fault: close the deadline without a penalty instead.
                 OrderCancelledEvent event = objectMapper.readValue(rawPayload, OrderCancelledEvent.class);
                 if (event.getAuctionId() != null) {
-                    emitPaymentTimeoutUseCase.emit(event.getAuctionId());
+                    if (BUYER_REQUESTED.equals(event.getReason())) {
+                        emitPaymentTimeoutUseCase.emit(event.getAuctionId());
+                    } else {
+                        log.info("Auction {} order cancelled ({}), closing payment without penalty",
+                                event.getAuctionId(), event.getReason());
+                        closePaymentWithoutPenaltyUseCase.close(event.getAuctionId());
+                    }
                 }
             }
         } catch (Exception e) {

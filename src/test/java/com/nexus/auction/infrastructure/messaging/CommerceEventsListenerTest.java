@@ -1,6 +1,7 @@
 package com.nexus.auction.infrastructure.messaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexus.auction.application.usecase.ClosePaymentWithoutPenaltyUseCase;
 import com.nexus.auction.application.usecase.EmitPaymentTimeoutUseCase;
 import com.nexus.auction.application.usecase.MarkAuctionPaidUseCase;
 import org.junit.jupiter.api.Test;
@@ -14,8 +15,10 @@ class CommerceEventsListenerTest {
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
     private final MarkAuctionPaidUseCase markAuctionPaidUseCase = mock(MarkAuctionPaidUseCase.class);
     private final EmitPaymentTimeoutUseCase emitPaymentTimeoutUseCase = mock(EmitPaymentTimeoutUseCase.class);
-    private final CommerceEventsListener listener =
-            new CommerceEventsListener(objectMapper, markAuctionPaidUseCase, emitPaymentTimeoutUseCase);
+    private final ClosePaymentWithoutPenaltyUseCase closePaymentWithoutPenaltyUseCase =
+            mock(ClosePaymentWithoutPenaltyUseCase.class);
+    private final CommerceEventsListener listener = new CommerceEventsListener(objectMapper,
+            markAuctionPaidUseCase, emitPaymentTimeoutUseCase, closePaymentWithoutPenaltyUseCase);
 
     @Test
     void onMessage_orderPaidWithAuctionId_marksTheAuctionPaid() {
@@ -50,6 +53,19 @@ class CommerceEventsListenerTest {
 
         verify(emitPaymentTimeoutUseCase).emit("auction-3");
         verify(markAuctionPaidUseCase, never()).markPaid(any(), any());
+        verify(closePaymentWithoutPenaltyUseCase, never()).close(any());
+    }
+
+    @Test
+    void onMessage_orderCancelledForStock_closesPaymentWithoutPenalty() {
+        String payload = "{\"eventId\":\"e-6\",\"eventType\":\"OrderCancelled\",\"occurredAt\":\"2026-01-01T00:00:00Z\","
+                + "\"aggregateId\":\"order-6\",\"orderId\":\"order-6\",\"reason\":\"INSUFFICIENT_STOCK\","
+                + "\"auctionId\":\"auction-6\"}";
+
+        listener.onMessage(payload);
+
+        verify(closePaymentWithoutPenaltyUseCase).close("auction-6");
+        verify(emitPaymentTimeoutUseCase, never()).emit(any());
     }
 
     @Test
