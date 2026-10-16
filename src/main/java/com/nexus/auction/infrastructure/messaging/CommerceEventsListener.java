@@ -1,5 +1,6 @@
 package com.nexus.auction.infrastructure.messaging;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexus.auction.application.usecase.ClosePaymentWithoutPenaltyUseCase;
 import com.nexus.auction.application.usecase.EmitPaymentTimeoutUseCase;
@@ -40,34 +41,32 @@ public class CommerceEventsListener {
         this.closePaymentWithoutPenaltyUseCase = closePaymentWithoutPenaltyUseCase;
     }
 
+    // Exceptions are NOT caught here on purpose: KafkaErrorHandlingConfig retries them, then
+    // moves the record to the dead-letter topic instead of losing it.
     @KafkaListener(topics = "commerce-events")
-    public void onMessage(String rawPayload) {
-        try {
-            String eventType = objectMapper.readTree(rawPayload).path("eventType").asText();
-            if ("OrderPaid".equals(eventType)) {
-                OrderPaidEvent event = objectMapper.readValue(rawPayload, OrderPaidEvent.class);
-                if (event.getAuctionId() != null) {
-                    markAuctionPaidUseCase.markPaid(event.getAuctionId(), event.getBuyerId());
-                }
-            } else if ("OrderCancelled".equals(eventType)) {
-                // The buyer backed out before the 24h deadline -- no need to wait for
-                // PaymentDeadlineJob to find out; EmitPaymentTimeoutUseCase is already
-                // idempotent, so the job finding this auction too (if it ever raced ahead)
-                // is a harmless no-op. Any other reason (out of stock, ...) is not the
-                // winner's fault: close the deadline without a penalty instead.
-                OrderCancelledEvent event = objectMapper.readValue(rawPayload, OrderCancelledEvent.class);
-                if (event.getAuctionId() != null) {
-                    if (BUYER_REQUESTED.equals(event.getReason())) {
-                        emitPaymentTimeoutUseCase.emit(event.getAuctionId());
-                    } else {
-                        log.info("Auction {} order cancelled ({}), closing payment without penalty",
-                                event.getAuctionId(), event.getReason());
-                        closePaymentWithoutPenaltyUseCase.close(event.getAuctionId());
-                    }
+    public void onMessage(String rawPayload) throws JsonProcessingException {
+        String eventType = objectMapper.readTree(rawPayload).path("eventType").asText();
+        if ("OrderPaid".equals(eventType)) {
+            OrderPaidEvent event = objectMapper.readValue(rawPayload, OrderPaidEvent.class);
+            if (event.getAuctionId() != null) {
+                markAuctionPaidUseCase.markPaid(event.getAuctionId(), event.getBuyerId());
+            }
+        } else if ("OrderCancelled".equals(eventType)) {
+            // The buyer backed out before the 24h deadline -- no need to wait for
+            // PaymentDeadlineJob to find out; EmitPaymentTimeoutUseCase is already
+            // idempotent, so the job finding this auction too (if it ever raced ahead)
+            // is a harmless no-op. Any other reason (out of stock, ...) is not the
+            // winner's fault: close the deadline without a penalty instead.
+            OrderCancelledEvent event = objectMapper.readValue(rawPayload, OrderCancelledEvent.class);
+            if (event.getAuctionId() != null) {
+                if (BUYER_REQUESTED.equals(event.getReason())) {
+                    emitPaymentTimeoutUseCase.emit(event.getAuctionId());
+                } else {
+                    log.info("Auction {} order cancelled ({}), closing payment without penalty",
+                            event.getAuctionId(), event.getReason());
+                    closePaymentWithoutPenaltyUseCase.close(event.getAuctionId());
                 }
             }
-        } catch (Exception e) {
-            log.error("Failed to process commerce-events message: {}", rawPayload, e);
         }
     }
 }

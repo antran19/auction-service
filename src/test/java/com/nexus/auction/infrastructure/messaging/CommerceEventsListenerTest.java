@@ -1,12 +1,13 @@
 package com.nexus.auction.infrastructure.messaging;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexus.auction.application.usecase.ClosePaymentWithoutPenaltyUseCase;
 import com.nexus.auction.application.usecase.EmitPaymentTimeoutUseCase;
 import com.nexus.auction.application.usecase.MarkAuctionPaidUseCase;
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -21,7 +22,7 @@ class CommerceEventsListenerTest {
             markAuctionPaidUseCase, emitPaymentTimeoutUseCase, closePaymentWithoutPenaltyUseCase);
 
     @Test
-    void onMessage_orderPaidWithAuctionId_marksTheAuctionPaid() {
+    void onMessage_orderPaidWithAuctionId_marksTheAuctionPaid() throws Exception {
         String payload = "{\"eventId\":\"e-1\",\"eventType\":\"OrderPaid\",\"occurredAt\":\"2026-01-01T00:00:00Z\","
                 + "\"aggregateId\":\"order-1\",\"orderId\":\"order-1\",\"buyerId\":\"buyer-1\","
                 + "\"auctionId\":\"auction-1\",\"amount\":500.00}";
@@ -33,7 +34,7 @@ class CommerceEventsListenerTest {
     }
 
     @Test
-    void onMessage_orderPaidWithoutAuctionId_doesNothing() {
+    void onMessage_orderPaidWithoutAuctionId_doesNothing() throws Exception {
         String payload = "{\"eventId\":\"e-2\",\"eventType\":\"OrderPaid\",\"occurredAt\":\"2026-01-01T00:00:00Z\","
                 + "\"aggregateId\":\"order-2\",\"orderId\":\"order-2\",\"buyerId\":\"buyer-1\","
                 + "\"auctionId\":null,\"amount\":500.00}";
@@ -44,7 +45,7 @@ class CommerceEventsListenerTest {
     }
 
     @Test
-    void onMessage_orderCancelledWithAuctionId_emitsPaymentTimeoutImmediately() {
+    void onMessage_orderCancelledWithAuctionId_emitsPaymentTimeoutImmediately() throws Exception {
         String payload = "{\"eventId\":\"e-3\",\"eventType\":\"OrderCancelled\",\"occurredAt\":\"2026-01-01T00:00:00Z\","
                 + "\"aggregateId\":\"order-3\",\"orderId\":\"order-3\",\"reason\":\"BUYER_REQUESTED\","
                 + "\"auctionId\":\"auction-3\"}";
@@ -57,7 +58,7 @@ class CommerceEventsListenerTest {
     }
 
     @Test
-    void onMessage_orderCancelledForStock_closesPaymentWithoutPenalty() {
+    void onMessage_orderCancelledForStock_closesPaymentWithoutPenalty() throws Exception {
         String payload = "{\"eventId\":\"e-6\",\"eventType\":\"OrderCancelled\",\"occurredAt\":\"2026-01-01T00:00:00Z\","
                 + "\"aggregateId\":\"order-6\",\"orderId\":\"order-6\",\"reason\":\"INSUFFICIENT_STOCK\","
                 + "\"auctionId\":\"auction-6\"}";
@@ -69,7 +70,7 @@ class CommerceEventsListenerTest {
     }
 
     @Test
-    void onMessage_orderCancelledWithoutAuctionId_doesNothing() {
+    void onMessage_orderCancelledWithoutAuctionId_doesNothing() throws Exception {
         String payload = "{\"eventId\":\"e-4\",\"eventType\":\"OrderCancelled\",\"occurredAt\":\"2026-01-01T00:00:00Z\","
                 + "\"aggregateId\":\"order-4\",\"orderId\":\"order-4\",\"reason\":\"BUYER_REQUESTED\","
                 + "\"auctionId\":null}";
@@ -80,7 +81,7 @@ class CommerceEventsListenerTest {
     }
 
     @Test
-    void onMessage_otherEventType_doesNothing() {
+    void onMessage_otherEventType_doesNothing() throws Exception {
         String payload = "{\"eventId\":\"e-5\",\"eventType\":\"SomethingElse\",\"occurredAt\":\"2026-01-01T00:00:00Z\","
                 + "\"aggregateId\":\"x\"}";
 
@@ -91,7 +92,8 @@ class CommerceEventsListenerTest {
     }
 
     @Test
-    void onMessage_malformedPayload_doesNotThrow() {
-        assertThatCode(() -> listener.onMessage("{not valid json")).doesNotThrowAnyException();
+    void onMessage_malformedPayload_throwsSoItGoesToDeadLetterTopic() throws Exception {
+        assertThatThrownBy(() -> listener.onMessage("{not valid json"))
+                .isInstanceOf(JsonProcessingException.class);
     }
 }
