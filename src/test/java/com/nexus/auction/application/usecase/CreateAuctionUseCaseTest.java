@@ -2,7 +2,10 @@ package com.nexus.auction.application.usecase;
 
 import com.nexus.auction.application.port.out.AuctionRepositoryPort;
 import com.nexus.auction.application.port.out.EventPublisherPort;
+import com.nexus.auction.application.port.out.ProductSnapshotRepositoryPort;
+import com.nexus.auction.application.port.out.ProductStockRepositoryPort;
 import com.nexus.auction.domain.model.Auction;
+import com.nexus.auction.domain.model.AuctionProduct;
 import com.nexus.common.core.exception.ConflictException;
 import com.nexus.common.core.exception.ForbiddenException;
 import com.nexus.common.core.exception.ValidationException;
@@ -12,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -22,13 +26,21 @@ class CreateAuctionUseCaseTest {
 
     private AuctionRepositoryPort auctionRepositoryPort;
     private EventPublisherPort eventPublisherPort;
+    private ProductSnapshotRepositoryPort productSnapshotRepositoryPort;
+    private ProductStockRepositoryPort productStockRepositoryPort;
     private CreateAuctionUseCase useCase;
 
     @BeforeEach
     void setUp() {
         auctionRepositoryPort = mock(AuctionRepositoryPort.class);
         eventPublisherPort = mock(EventPublisherPort.class);
-        useCase = new CreateAuctionUseCase(auctionRepositoryPort, eventPublisherPort);
+        productSnapshotRepositoryPort = mock(ProductSnapshotRepositoryPort.class);
+        productStockRepositoryPort = mock(ProductStockRepositoryPort.class);
+        useCase = new CreateAuctionUseCase(auctionRepositoryPort, eventPublisherPort, productSnapshotRepositoryPort,
+                productStockRepositoryPort);
+        when(productSnapshotRepositoryPort.findById("product-1"))
+                .thenReturn(Optional.of(AuctionProduct.create("product-1", "seller-1").withStatus("ACTIVE")));
+        when(productStockRepositoryPort.availableQuantity("product-1")).thenReturn(1);
 
         when(auctionRepositoryPort.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
         when(auctionRepositoryPort.existsActiveOrPendingForProduct(any())).thenReturn(false);
@@ -115,5 +127,48 @@ class CreateAuctionUseCaseTest {
         AuctionResult result = useCase.create(command);
 
         assertThat(result.status()).isEqualTo("PENDING");
+    }
+
+    @Test
+    void create_rejectsAProductAuctionDoesNotKnow() {
+        when(productSnapshotRepositoryPort.findById("product-1")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> useCase.create(validCommand()))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("errorCode", "PRODUCT_NOT_AVAILABLE");
+        verify(auctionRepositoryPort, never()).save(any());
+    }
+
+    @Test
+    void create_rejectsAProductThatIsNotActive() {
+        when(productSnapshotRepositoryPort.findById("product-1"))
+                .thenReturn(Optional.of(AuctionProduct.create("product-1", "seller-1")));
+
+        assertThatThrownBy(() -> useCase.create(validCommand()))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("errorCode", "PRODUCT_NOT_AVAILABLE");
+        verify(auctionRepositoryPort, never()).save(any());
+    }
+
+    @Test
+    void create_rejectsASellerAuctioningSomeoneElsesProduct() {
+        when(productSnapshotRepositoryPort.findById("product-1"))
+                .thenReturn(Optional.of(AuctionProduct.create("product-1", "seller-2").withStatus("ACTIVE")));
+
+        assertThatThrownBy(() -> useCase.create(validCommand()))
+                .isInstanceOf(ForbiddenException.class)
+                .hasFieldOrPropertyWithValue("errorCode", "NOT_THE_PRODUCT_OWNER");
+        verify(auctionRepositoryPort, never()).save(any());
+        verify(eventPublisherPort, never()).publish(any());
+    }
+
+    @Test
+    void create_rejectsAProductWithNoStockLeft() {
+        when(productStockRepositoryPort.availableQuantity("product-1")).thenReturn(0);
+
+        assertThatThrownBy(() -> useCase.create(validCommand()))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("errorCode", "INSUFFICIENT_STOCK");
+        verify(auctionRepositoryPort, never()).save(any());
     }
 }

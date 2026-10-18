@@ -2,6 +2,8 @@ package com.nexus.auction.infrastructure.config;
 
 import com.nexus.auction.application.port.out.AuctionRepositoryPort;
 import com.nexus.auction.application.port.out.EventPublisherPort;
+import com.nexus.auction.application.port.out.ProductSnapshotRepositoryPort;
+import com.nexus.auction.application.port.out.ProductStockRepositoryPort;
 import com.nexus.auction.application.usecase.AdminCancelAuctionUseCase;
 import com.nexus.auction.application.usecase.CancelAuctionUseCase;
 import com.nexus.auction.application.port.out.BidRepositoryPort;
@@ -15,6 +17,8 @@ import com.nexus.auction.application.usecase.ListAuctionsUseCase;
 import com.nexus.auction.application.usecase.MarkAuctionPaidUseCase;
 import com.nexus.auction.application.usecase.PlaceBidUseCase;
 import com.nexus.auction.application.usecase.StartAuctionUseCase;
+import com.nexus.auction.application.usecase.SyncProductSnapshotUseCase;
+import com.nexus.auction.application.usecase.SyncProductStockUseCase;
 import com.nexus.auction.application.usecase.UpdateAuctionUseCase;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,8 +28,21 @@ public class UseCaseConfig {
 
     @Bean
     public CreateAuctionUseCase createAuctionUseCase(AuctionRepositoryPort auctionPort,
-                                                       EventPublisherPort eventPublisherPort) {
-        return new CreateAuctionUseCase(auctionPort, eventPublisherPort);
+                                                       EventPublisherPort eventPublisherPort,
+                                                       ProductSnapshotRepositoryPort productSnapshotRepositoryPort,
+                                                       ProductStockRepositoryPort productStockRepositoryPort) {
+        return new CreateAuctionUseCase(auctionPort, eventPublisherPort, productSnapshotRepositoryPort,
+                productStockRepositoryPort);
+    }
+
+    @Bean
+    public SyncProductSnapshotUseCase syncProductSnapshotUseCase(ProductSnapshotRepositoryPort productSnapshotRepositoryPort) {
+        return new SyncProductSnapshotUseCase(productSnapshotRepositoryPort);
+    }
+
+    @Bean
+    public SyncProductStockUseCase syncProductStockUseCase(ProductStockRepositoryPort productStockRepositoryPort) {
+        return new SyncProductStockUseCase(productStockRepositoryPort);
     }
 
     @Bean

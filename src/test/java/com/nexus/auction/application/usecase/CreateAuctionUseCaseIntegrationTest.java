@@ -45,6 +45,7 @@ class CreateAuctionUseCaseIntegrationTest {
     @Autowired private CreateAuctionUseCase createAuctionUseCase;
     @Autowired private AuctionRepositoryPort auctionRepositoryPort;
     @Autowired private OutboxJpaRepository outboxJpaRepository;
+    @Autowired private JdbcTemplate seedJdbc;
 
     private CreateAuctionCommand command() {
         // Random productId each call — the outer test and the nested test share the same
@@ -53,8 +54,15 @@ class CreateAuctionUseCaseIntegrationTest {
         // literal here made the nested test collide with the outer test's already-persisted
         // auction and fail with the wrong exception (ConflictException, not the simulated
         // outbox failure).
+        // The product must be known to auction-service (ACTIVE, owned by the seller, in stock),
+        // as the catalog/fulfillment events would have recorded it.
+        String productId = UUID.randomUUID().toString();
+        seedJdbc.update("INSERT INTO product_snapshots (product_id, seller_id, status, updated_at) "
+                + "VALUES (?, 'seller-1', 'ACTIVE', now())", productId);
+        seedJdbc.update("INSERT INTO product_stock_levels (product_id, available_quantity, as_of) "
+                + "VALUES (?, 1, now())", productId);
         Instant start = Instant.now().plus(1, ChronoUnit.HOURS);
-        return new CreateAuctionCommand(UUID.randomUUID().toString(), "seller-1",
+        return new CreateAuctionCommand(productId, "seller-1",
                 new BigDecimal("100.00"), new BigDecimal("10.00"), start, start.plus(2, ChronoUnit.HOURS), "TRUSTED");
     }
 

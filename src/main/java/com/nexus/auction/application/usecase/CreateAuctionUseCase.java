@@ -2,7 +2,10 @@ package com.nexus.auction.application.usecase;
 
 import com.nexus.auction.application.port.out.AuctionRepositoryPort;
 import com.nexus.auction.application.port.out.EventPublisherPort;
+import com.nexus.auction.application.port.out.ProductSnapshotRepositoryPort;
+import com.nexus.auction.application.port.out.ProductStockRepositoryPort;
 import com.nexus.auction.domain.model.Auction;
+import com.nexus.auction.domain.model.AuctionProduct;
 import com.nexus.common.core.FieldError;
 import com.nexus.common.core.exception.ConflictException;
 import com.nexus.common.core.exception.ForbiddenException;
@@ -22,10 +25,16 @@ public class CreateAuctionUseCase {
 
     private final AuctionRepositoryPort auctionRepositoryPort;
     private final EventPublisherPort eventPublisherPort;
+    private final ProductSnapshotRepositoryPort productSnapshotRepositoryPort;
+    private final ProductStockRepositoryPort productStockRepositoryPort;
 
-    public CreateAuctionUseCase(AuctionRepositoryPort auctionRepositoryPort, EventPublisherPort eventPublisherPort) {
+    public CreateAuctionUseCase(AuctionRepositoryPort auctionRepositoryPort, EventPublisherPort eventPublisherPort,
+                                ProductSnapshotRepositoryPort productSnapshotRepositoryPort,
+                                ProductStockRepositoryPort productStockRepositoryPort) {
         this.auctionRepositoryPort = auctionRepositoryPort;
         this.eventPublisherPort = eventPublisherPort;
+        this.productSnapshotRepositoryPort = productSnapshotRepositoryPort;
+        this.productStockRepositoryPort = productStockRepositoryPort;
     }
 
     @Transactional
@@ -38,6 +47,7 @@ public class CreateAuctionUseCase {
         }
 
         validateWindow(command.startTime(), command.endTime());
+        requireOwnProductInStock(command.productId(), command.sellerId());
 
         if (auctionRepositoryPort.existsActiveOrPendingForProduct(command.productId())) {
             throw new ConflictException("PRODUCT_ALREADY_IN_AUCTION",
@@ -55,6 +65,24 @@ public class CreateAuctionUseCase {
         eventPublisherPort.publish(new AuctionCreatedEvent(saved.getId(), saved.getProductId(), saved.getSellerId()));
 
         return toResult(saved);
+    }
+
+    // The winner's order is filed under the auction's seller but takes the PRODUCT's stock, so a
+    // seller auctioning someone else's product would take the money for goods that aren't theirs.
+    // Checked against auction-service's own copy of the catalog and of the stock (fed by events).
+    // The unit is not held for the auction's duration: if it sells elsewhere meanwhile, the
+    // winner's order is cancelled for lack of stock without penalising the winner.
+    private void requireOwnProductInStock(String productId, String sellerId) {
+        AuctionProduct product = productSnapshotRepositoryPort.findById(productId)
+                .filter(AuctionProduct::isAuctionable)
+                .orElseThrow(() -> new ConflictException("PRODUCT_NOT_AVAILABLE",
+                        "Product is not available for auction: " + productId));
+        if (!product.isOwnedBy(sellerId)) {
+            throw new ForbiddenException("NOT_THE_PRODUCT_OWNER", "You can only auction your own products");
+        }
+        if (productStockRepositoryPort.availableQuantity(productId) < 1) {
+            throw new ConflictException("INSUFFICIENT_STOCK", "Product has no stock left to auction: " + productId);
+        }
     }
 
     // Package-private (not private) so UpdateAuctionUseCase — same package — reuses the
