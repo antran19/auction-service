@@ -5,6 +5,7 @@ import com.nexus.auction.application.port.out.EventPublisherPort;
 import com.nexus.auction.application.port.out.ProductSnapshotRepositoryPort;
 import com.nexus.auction.application.port.out.ProductStockRepositoryPort;
 import com.nexus.auction.application.usecase.AdminCancelAuctionUseCase;
+import com.nexus.auction.application.usecase.CancelAuctionForMissingStockUseCase;
 import com.nexus.auction.application.usecase.CancelAuctionUseCase;
 import com.nexus.auction.application.port.out.BidRepositoryPort;
 import com.nexus.auction.application.usecase.ClosePaymentWithoutPenaltyUseCase;
@@ -33,6 +34,12 @@ public class UseCaseConfig {
                                                        ProductStockRepositoryPort productStockRepositoryPort) {
         return new CreateAuctionUseCase(auctionPort, eventPublisherPort, productSnapshotRepositoryPort,
                 productStockRepositoryPort);
+    }
+
+    @Bean
+    public CancelAuctionForMissingStockUseCase cancelAuctionForMissingStockUseCase(AuctionRepositoryPort auctionPort,
+                                                                                   EventPublisherPort eventPublisherPort) {
+        return new CancelAuctionForMissingStockUseCase(auctionPort, eventPublisherPort);
     }
 
     @Bean

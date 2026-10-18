@@ -31,6 +31,7 @@ public class EmitPaymentTimeoutUseCase {
         }
 
         Auction flagged = auctionRepositoryPort.save(auction.withPaymentTimeoutEmitted());
-        eventPublisherPort.publish(new AuctionPaymentTimeoutEvent(flagged.getId(), flagged.getWinnerId()));
+        eventPublisherPort.publish(new AuctionPaymentTimeoutEvent(flagged.getId(), flagged.getWinnerId(),
+                flagged.getProductId()));
     }
 }

@@ -48,6 +48,9 @@ class EmitPaymentTimeoutUseCaseTest {
 
         verify(auctionRepositoryPort).save(argThat(Auction::isPaymentTimeoutEmitted));
         verify(eventPublisherPort).publish(any(AuctionPaymentTimeoutEvent.class));
+        // catalog puts the product back on sale and fulfillment releases its held unit from this.
+        verify(eventPublisherPort).publish(org.mockito.ArgumentMatchers.argThat(e ->
+                e instanceof AuctionPaymentTimeoutEvent evt && "product-1".equals(evt.getProductId())));
     }
 
     @Test
