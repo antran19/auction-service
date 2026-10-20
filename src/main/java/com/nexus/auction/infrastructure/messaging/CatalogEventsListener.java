@@ -21,7 +21,7 @@ public class CatalogEventsListener {
         this.syncProductSnapshotUseCase = syncProductSnapshotUseCase;
     }
 
-    // Exceptions are NOT caught here on purpose: KafkaErrorHandlingConfig retries them, then
+    // Exceptions are NOT caught here on purpose: NexusKafkaAutoConfiguration (common-kafka) retries them, then
     // moves the record to the dead-letter topic instead of losing it.
     @KafkaListener(topics = "catalog-events")
     public void onMessage(String rawPayload) throws JsonProcessingException {
