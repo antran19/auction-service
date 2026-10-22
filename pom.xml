@@ -10,6 +10,7 @@
   <packaging>jar</packaging>
 
   <properties>
+    <jacocoArgLine></jacocoArgLine>
     <java.version>21</java.version>
     <maven.compiler.source>21</maven.compiler.source>
     <maven.compiler.target>21</maven.compiler.target>
@@ -196,11 +197,44 @@
         </executions>
       </plugin>
       <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>0.8.12</version>
+        <executions>
+          <!-- Puts the JaCoCo agent into the property jacocoArgLine; surefire's argLine below picks it
+               up with @{jacocoArgLine} so it runs together with the byte-buddy agent. -->
+          <execution>
+            <id>prepare-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+            <configuration>
+              <propertyName>jacocoArgLine</propertyName>
+            </configuration>
+          </execution>
+          <!-- Report in target/site/jacoco (html, csv, xml). Generated classes are left out so the
+               numbers describe code the team wrote. -->
+          <execution>
+            <id>report</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+            <configuration>
+              <excludes>
+                <exclude>**/*MapperImpl.class</exclude>
+                <exclude>**/*Application.class</exclude>
+              </excludes>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>3.2.5</version>
         <configuration>
-          <argLine>-javaagent:${net.bytebuddy:byte-buddy-agent:jar}</argLine>
+          <argLine>@{jacocoArgLine} -javaagent:${net.bytebuddy:byte-buddy-agent:jar}</argLine>
         </configuration>
       </plugin>    </plugins>
   </build>

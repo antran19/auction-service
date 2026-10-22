@@ -34,3 +34,26 @@ jobs:
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Coverage comes from the JaCoCo report written during `verify` (see pom.xml).
+      - name: Coverage summary
+        if: always()
+        run: |
+          f=target/site/jacoco/jacoco.csv
+          if [ -f "$f" ]; then
+            awk -F, 'NR>1 { bm+=$6; bc+=$7; lm+=$8; lc+=$9 }
+              END {
+                lt=lm+lc; bt=bm+bc;
+                printf "### Test coverage (JaCoCo)\n\n| | covered | total | %% |\n|---|---|---|---|\n";
+                printf "| Lines | %d | %d | %.1f |\n", lc, lt, (lt ? 100*lc/lt : 0);
+                printf "| Branches | %d | %d | %.1f |\n", bc, bt, (bt ? 100*bc/bt : 0)
+              }' "$f" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: target/site/jacoco
+          if-no-files-found: ignore
