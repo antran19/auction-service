@@ -1,5 +1,7 @@
 package com.nexus.auction.domain.model;
 
+import com.nexus.common.core.exception.ConflictException;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -68,7 +70,12 @@ public class Auction {
                 paymentDeadline, paymentTimeoutEmitted, paidAt, createdAt, updatedAt);
     }
 
+    // Refuses a move the lifecycle does not allow (see AuctionStatus.canTransitionTo).
     public Auction withStatus(AuctionStatus newStatus) {
+        if (!status.canTransitionTo(newStatus)) {
+            throw new ConflictException("INVALID_AUCTION_TRANSITION",
+                    "An auction cannot go from " + status + " to " + newStatus + ": " + id);
+        }
         return new Auction(id, productId, sellerId, startingPrice, bidIncrement, currentHighestBid,
                 currentHighestBidderId, newStatus, startTime, endTime, extensionCount, winnerId, finalPrice,
                 paymentDeadline, paymentTimeoutEmitted, paidAt, createdAt, Instant.now());

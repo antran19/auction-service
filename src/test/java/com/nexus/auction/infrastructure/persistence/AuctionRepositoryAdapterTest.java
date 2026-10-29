@@ -81,7 +81,7 @@ class AuctionRepositoryAdapterTest {
 
     @Test
     void existsActiveOrPendingForProduct_falseOnceEnded() {
-        Auction auction = newAuction().withStatus(AuctionStatus.ENDED);
+        Auction auction = newAuction().withStatus(AuctionStatus.ACTIVE).withStatus(AuctionStatus.ENDED);
         adapter.save(auction);
 
         assertThat(adapter.existsActiveOrPendingForProduct(auction.getProductId())).isFalse();

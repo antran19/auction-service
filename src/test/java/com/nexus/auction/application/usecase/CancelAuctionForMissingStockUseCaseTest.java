@@ -31,8 +31,15 @@ class CancelAuctionForMissingStockUseCaseTest {
 
     private Auction auction(AuctionStatus status) {
         Instant start = Instant.now().plus(1, ChronoUnit.MINUTES);
-        return Auction.create("product-1", "seller-1", new BigDecimal("100.00"), new BigDecimal("10.00"),
-                start, start.plus(2, ChronoUnit.HOURS)).withStatus(status);
+        Auction pending = Auction.create("product-1", "seller-1", new BigDecimal("100.00"), new BigDecimal("10.00"),
+                start, start.plus(2, ChronoUnit.HOURS));
+        // Reach each status by a move the lifecycle allows (withStatus refuses the others).
+        return switch (status) {
+            case PENDING -> pending;
+            case ACTIVE -> pending.withStatus(AuctionStatus.ACTIVE);
+            case ENDED -> pending.withStatus(AuctionStatus.ACTIVE).withStatus(AuctionStatus.ENDED);
+            case CANCELLED -> pending.withStatus(AuctionStatus.CANCELLED);
+        };
     }
 
     @Test

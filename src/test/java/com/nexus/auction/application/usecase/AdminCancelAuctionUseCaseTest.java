@@ -56,7 +56,7 @@ class AdminCancelAuctionUseCaseTest {
         Instant start = Instant.now().minus(3, ChronoUnit.HOURS);
         Auction ended = Auction.create("product-1", "seller-1", new BigDecimal("100.00"), new BigDecimal("10.00"),
                         start, start.plus(1, ChronoUnit.HOURS))
-                .withStatus(AuctionStatus.ENDED);
+                .withStatus(AuctionStatus.ACTIVE).withStatus(AuctionStatus.ENDED);
         when(auctionRepositoryPort.findByIdForUpdate(ended.getId())).thenReturn(Optional.of(ended));
 
         assertThatThrownBy(() -> useCase.cancel(ended.getId(), "admin-1"))
