@@ -2,6 +2,7 @@ package com.nexus.auction.application.usecase;
 
 import com.nexus.auction.application.exception.AuctionNotFoundException;
 import com.nexus.auction.application.port.out.AuctionRepositoryPort;
+import com.nexus.auction.application.port.out.BidBroadcastPort;
 import com.nexus.auction.application.port.out.BidRepositoryPort;
 import com.nexus.auction.application.port.out.EventPublisherPort;
 import com.nexus.auction.domain.model.Auction;
@@ -30,6 +31,7 @@ class PlaceBidUseCaseTest {
     private AuctionRepositoryPort auctionRepositoryPort;
     private BidRepositoryPort bidRepositoryPort;
     private EventPublisherPort eventPublisherPort;
+    private BidBroadcastPort bidBroadcastPort;
     private PlaceBidUseCase useCase;
 
     @BeforeEach
@@ -37,7 +39,8 @@ class PlaceBidUseCaseTest {
         auctionRepositoryPort = mock(AuctionRepositoryPort.class);
         bidRepositoryPort = mock(BidRepositoryPort.class);
         eventPublisherPort = mock(EventPublisherPort.class);
-        useCase = new PlaceBidUseCase(auctionRepositoryPort, bidRepositoryPort, eventPublisherPort);
+        bidBroadcastPort = mock(BidBroadcastPort.class);
+        useCase = new PlaceBidUseCase(auctionRepositoryPort, bidRepositoryPort, eventPublisherPort, bidBroadcastPort);
         when(auctionRepositoryPort.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
         when(bidRepositoryPort.save(any(Bid.class))).thenAnswer(inv -> inv.getArgument(0));
     }
@@ -59,6 +62,27 @@ class PlaceBidUseCaseTest {
         assertThat(result.amount()).isEqualByComparingTo("100.00");
         verify(auctionRepositoryPort).save(argThat(a -> a.getCurrentHighestBidderId().equals("bidder-1")));
         verify(eventPublisherPort).publish(any(BidPlacedEvent.class));
+    }
+
+    @Test
+    void placeBid_announcesTheAcceptedBidToTheWatchers() {
+        Auction auction = activeAuction();
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
+
+        BidResult result = useCase.placeBid(auction.getId(), "bidder-1", new BigDecimal("100.00"), "TRUSTED");
+
+        verify(bidBroadcastPort).bidPlaced(result);
+    }
+
+    @Test
+    void placeBid_announcesNothingWhenTheBidIsRefused() {
+        Auction auction = activeAuction();
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
+
+        assertThatThrownBy(() -> useCase.placeBid(auction.getId(), "bidder-1", new BigDecimal("50.00"), "TRUSTED"))
+                .isInstanceOf(ValidationException.class);
+
+        verifyNoInteractions(bidBroadcastPort);
     }
 
     @Test

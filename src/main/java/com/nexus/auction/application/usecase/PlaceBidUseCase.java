@@ -2,6 +2,7 @@ package com.nexus.auction.application.usecase;
 
 import com.nexus.auction.application.exception.AuctionNotFoundException;
 import com.nexus.auction.application.port.out.AuctionRepositoryPort;
+import com.nexus.auction.application.port.out.BidBroadcastPort;
 import com.nexus.auction.application.port.out.BidRepositoryPort;
 import com.nexus.auction.application.port.out.EventPublisherPort;
 import com.nexus.auction.domain.model.Auction;
@@ -22,12 +23,14 @@ public class PlaceBidUseCase {
     private final AuctionRepositoryPort auctionRepositoryPort;
     private final BidRepositoryPort bidRepositoryPort;
     private final EventPublisherPort eventPublisherPort;
+    private final BidBroadcastPort bidBroadcastPort;
 
     public PlaceBidUseCase(AuctionRepositoryPort auctionRepositoryPort, BidRepositoryPort bidRepositoryPort,
-                            EventPublisherPort eventPublisherPort) {
+                            EventPublisherPort eventPublisherPort, BidBroadcastPort bidBroadcastPort) {
         this.auctionRepositoryPort = auctionRepositoryPort;
         this.bidRepositoryPort = bidRepositoryPort;
         this.eventPublisherPort = eventPublisherPort;
+        this.bidBroadcastPort = bidBroadcastPort;
     }
 
     // @Transactional is what makes findByIdForUpdate's SELECT ... FOR UPDATE actually hold the
@@ -66,6 +69,8 @@ public class PlaceBidUseCase {
             eventPublisherPort.publish(new OutbidEvent(auctionId, previousHighestBidderId, amount));
         }
 
-        return new BidResult(bid.getId(), auctionId, bidderId, amount, bid.getPlacedAt());
+        BidResult result = new BidResult(bid.getId(), auctionId, bidderId, amount, bid.getPlacedAt());
+        bidBroadcastPort.bidPlaced(result);
+        return result;
     }
 }

@@ -8,6 +8,7 @@ import com.nexus.auction.application.usecase.AdminCancelAuctionUseCase;
 import com.nexus.auction.application.usecase.CancelAuctionForMissingStockUseCase;
 import com.nexus.auction.application.usecase.CancelAuctionUseCase;
 import com.nexus.auction.application.port.out.AutoBidRepositoryPort;
+import com.nexus.auction.application.port.out.BidBroadcastPort;
 import com.nexus.auction.application.port.out.BidRepositoryPort;
 import com.nexus.auction.application.usecase.ClosePaymentWithoutPenaltyUseCase;
 import com.nexus.auction.application.usecase.CreateAuctionUseCase;
@@ -73,8 +74,8 @@ public class UseCaseConfig {
 
     @Bean
     public PlaceBidUseCase placeBidUseCase(AuctionRepositoryPort auctionPort, BidRepositoryPort bidPort,
-                                            EventPublisherPort eventPublisherPort) {
-        return new PlaceBidUseCase(auctionPort, bidPort, eventPublisherPort);
+                                            EventPublisherPort eventPublisherPort, BidBroadcastPort bidBroadcastPort) {
+        return new PlaceBidUseCase(auctionPort, bidPort, eventPublisherPort, bidBroadcastPort);
     }
 
     @Bean
