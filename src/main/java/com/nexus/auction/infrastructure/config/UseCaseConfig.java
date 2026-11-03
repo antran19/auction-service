@@ -74,8 +74,9 @@ public class UseCaseConfig {
 
     @Bean
     public PlaceBidUseCase placeBidUseCase(AuctionRepositoryPort auctionPort, BidRepositoryPort bidPort,
-                                            EventPublisherPort eventPublisherPort, BidBroadcastPort bidBroadcastPort) {
-        return new PlaceBidUseCase(auctionPort, bidPort, eventPublisherPort, bidBroadcastPort);
+                                            EventPublisherPort eventPublisherPort, BidBroadcastPort bidBroadcastPort,
+                                            AutoBidRepositoryPort autoBidPort) {
+        return new PlaceBidUseCase(auctionPort, bidPort, eventPublisherPort, bidBroadcastPort, autoBidPort);
     }
 
     @Bean
