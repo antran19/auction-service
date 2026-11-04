@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashSet;
+import java.util.Optional;
 import java.util.Set;
 
 // Stores a bidder's maximum for one auction and, in the same transaction, places the bids that
@@ -55,10 +56,15 @@ public class SetAutoBidUseCase {
         Auction auction = auctionRepositoryPort.findByIdForUpdate(auctionId)
                 .orElseThrow(() -> new AuctionNotFoundException(auctionId));
 
+        Optional<AutoBid> existing = autoBidRepositoryPort.findByAuctionIdAndBidderId(auctionId, bidderId);
+        // Checked before the minimum bid: a person who lowers their maximum is told that it cannot
+        // be lowered, not that the amount is below the current price (which it usually is by then).
+        existing.ifPresent(current -> rejectLowering(current, maxAmount));
+
         BidValidationPolicy.validate(auction, bidderId, maxAmount, Instant.now());
 
-        AutoBid saved = autoBidRepositoryPort.findByAuctionIdAndBidderId(auctionId, bidderId)
-                .map(existing -> raise(existing, maxAmount))
+        AutoBid saved = existing
+                .map(current -> raise(current, maxAmount))
                 .orElseGet(() -> autoBidRepositoryPort.save(AutoBid.create(auctionId, bidderId, maxAmount)));
 
         // The new maximum may already be enough to lead, or to answer the bid that leads. Setting
@@ -84,13 +90,15 @@ public class SetAutoBidUseCase {
                 saved.getUpdatedAt());
     }
 
-    private AutoBid raise(AutoBid existing, BigDecimal maxAmount) {
-        int comparison = maxAmount.compareTo(existing.getMaxAmount());
-        if (comparison < 0) {
+    private void rejectLowering(AutoBid existing, BigDecimal maxAmount) {
+        if (maxAmount.compareTo(existing.getMaxAmount()) < 0) {
             throw new ConflictException("AUTO_BID_CANNOT_BE_LOWERED",
                     "Your maximum for this auction is " + existing.getMaxAmount() + " and cannot be lowered");
         }
-        if (comparison == 0) {
+    }
+
+    private AutoBid raise(AutoBid existing, BigDecimal maxAmount) {
+        if (maxAmount.compareTo(existing.getMaxAmount()) == 0) {
             return existing;
         }
         return autoBidRepositoryPort.save(existing.withMaxAmount(maxAmount));

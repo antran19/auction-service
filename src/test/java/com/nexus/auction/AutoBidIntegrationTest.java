@@ -241,4 +241,94 @@ class AutoBidIntegrationTest {
         assertThat(historyOf(auctionId)).containsExactly("an:100");
         assertThat((BigDecimal) auctionRow(auctionId).get("current_highest_bid")).isEqualByComparingTo("100.00");
     }
+
+    // ---- the endpoint, over HTTP
+
+    @SuppressWarnings("rawtypes")
+    private ResponseEntity<Map> put(String auctionId, String user, Object maxAmount, boolean withToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        if (withToken) {
+            headers.setBearerAuth(jwtTokenProvider.generateToken(user, "BUYER", List.of("AUCTION.BID"), "TRUSTED"));
+        }
+        return rest.exchange("/api/v1/auctions/" + auctionId + "/auto-bid", HttpMethod.PUT,
+                new HttpEntity<>(Map.of("maxAmount", maxAmount), headers), Map.class);
+    }
+
+    @SuppressWarnings("rawtypes")
+    @Test
+    void putAutoBid_storesTheMaximum_andPlacesTheStartingPriceBid() {
+        String auctionId = seedAuction();
+
+        ResponseEntity<Map> response = put(auctionId, "an", 500, true);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(((Map) response.getBody().get("data")).get("bidderId")).isEqualTo("an");
+        assertThat(historyOf(auctionId)).containsExactly("an:100");
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM auto_bids WHERE auction_id = ?", Integer.class,
+                UUID.fromString(auctionId))).isEqualTo(1);
+    }
+
+    @SuppressWarnings("rawtypes")
+    @Test
+    void putAutoBid_answersALaterManualBidOverHttp() {
+        String auctionId = seedAuction();
+        put(auctionId, "an", 500, true);
+
+        post(auctionId, "binh", 150);
+
+        assertThat(auctionRow(auctionId).get("current_highest_bidder_id")).isEqualTo("an");
+        assertThat((BigDecimal) auctionRow(auctionId).get("current_highest_bid")).isEqualByComparingTo("160.00");
+    }
+
+    @SuppressWarnings("rawtypes")
+    @Test
+    void putAutoBid_refusesToLowerTheMaximum_with409() {
+        String auctionId = seedAuction();
+        put(auctionId, "an", 500, true);
+
+        ResponseEntity<Map> response = put(auctionId, "an", 300, true);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(((Map) response.getBody().get("error")).get("code")).isEqualTo("AUTO_BID_CANNOT_BE_LOWERED");
+        assertThat(jdbcTemplate.queryForObject("SELECT max_amount FROM auto_bids WHERE auction_id = ?", BigDecimal.class,
+                UUID.fromString(auctionId))).isEqualByComparingTo("500.00");
+    }
+
+    @SuppressWarnings("rawtypes")
+    @Test
+    void putAutoBid_loweringIsRefusedAs409_evenWhenThePriceIsAlreadyAboveTheNewValue() {
+        String auctionId = seedAuction();
+        put(auctionId, "an", 500, true);
+        put(auctionId, "chi", 505, true);
+
+        // The price is now 505, so 300 is also below the minimum bid; the person must still be told
+        // that a maximum cannot be lowered.
+        ResponseEntity<Map> response = put(auctionId, "an", 300, true);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(((Map) response.getBody().get("error")).get("code")).isEqualTo("AUTO_BID_CANNOT_BE_LOWERED");
+    }
+
+    @SuppressWarnings("rawtypes")
+    @Test
+    void putAutoBid_withoutAToken_isRefused() {
+        String auctionId = seedAuction();
+
+        ResponseEntity<Map> response = put(auctionId, "an", 500, false);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(historyOf(auctionId)).isEmpty();
+    }
+
+    @SuppressWarnings("rawtypes")
+    @Test
+    void putAutoBid_theSellerCannotSetOneOnTheirOwnAuction() {
+        String auctionId = seedAuction();
+
+        ResponseEntity<Map> response = put(auctionId, "seller-1", 500, true);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(((Map) response.getBody().get("error")).get("code")).isEqualTo("SELLER_CANNOT_BID_OWN_AUCTION");
+    }
 }
