@@ -7,10 +7,8 @@ import com.nexus.auction.application.port.out.BidBroadcastPort;
 import com.nexus.auction.application.port.out.BidRepositoryPort;
 import com.nexus.auction.application.port.out.EventPublisherPort;
 import com.nexus.auction.domain.model.Auction;
-import com.nexus.auction.domain.model.AutoBid;
 import com.nexus.auction.domain.model.Bid;
 import com.nexus.auction.domain.service.AntiSnipingPolicy;
-import com.nexus.auction.domain.service.AutoBidResolver;
 import com.nexus.auction.domain.service.BidValidationPolicy;
 import com.nexus.common.core.exception.ForbiddenException;
 import com.nexus.common.events.BidPlacedEvent;
@@ -20,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -30,7 +27,7 @@ public class PlaceBidUseCase {
     private final BidRepositoryPort bidRepositoryPort;
     private final EventPublisherPort eventPublisherPort;
     private final BidBroadcastPort bidBroadcastPort;
-    private final AutoBidRepositoryPort autoBidRepositoryPort;
+    private final AutoBidResponder autoBidResponder;
 
     public PlaceBidUseCase(AuctionRepositoryPort auctionRepositoryPort, BidRepositoryPort bidRepositoryPort,
                             EventPublisherPort eventPublisherPort, BidBroadcastPort bidBroadcastPort,
@@ -39,7 +36,7 @@ public class PlaceBidUseCase {
         this.bidRepositoryPort = bidRepositoryPort;
         this.eventPublisherPort = eventPublisherPort;
         this.bidBroadcastPort = bidBroadcastPort;
-        this.autoBidRepositoryPort = autoBidRepositoryPort;
+        this.autoBidResponder = new AutoBidResponder(bidRepositoryPort, autoBidRepositoryPort, bidBroadcastPort);
     }
 
     // @Transactional is what makes findByIdForUpdate's SELECT ... FOR UPDATE actually hold the
@@ -78,7 +75,7 @@ public class PlaceBidUseCase {
         bidBroadcastPort.bidPlaced(result);
 
         // The standing maximums answer the bid, inside the same row lock.
-        updated = answerWithAutoBids(updated);
+        updated = autoBidResponder.answer(updated);
 
         auctionRepositoryPort.save(updated);
 
@@ -96,20 +93,5 @@ public class PlaceBidUseCase {
         }
 
         return result;
-    }
-
-    private Auction answerWithAutoBids(Auction auction) {
-        List<AutoBid> autoBids = autoBidRepositoryPort.findByAuctionId(auction.getId());
-        List<AutoBidResolver.Step> steps = AutoBidResolver.resolve(auction.getStartingPrice(), auction.getBidIncrement(),
-                auction.getCurrentHighestBid(), auction.getCurrentHighestBidderId(), autoBids);
-        Auction current = auction;
-        for (AutoBidResolver.Step step : steps) {
-            Bid autoBid = Bid.create(auction.getId(), step.bidderId(), step.amount());
-            bidRepositoryPort.save(autoBid);
-            current = current.withBid(step.bidderId(), step.amount());
-            bidBroadcastPort.bidPlaced(new BidResult(autoBid.getId(), auction.getId(), step.bidderId(),
-                    step.amount(), autoBid.getPlacedAt()));
-        }
-        return current;
     }
 }

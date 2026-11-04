@@ -80,8 +80,10 @@ public class UseCaseConfig {
     }
 
     @Bean
-    public SetAutoBidUseCase setAutoBidUseCase(AuctionRepositoryPort auctionPort, AutoBidRepositoryPort autoBidPort) {
-        return new SetAutoBidUseCase(auctionPort, autoBidPort);
+    public SetAutoBidUseCase setAutoBidUseCase(AuctionRepositoryPort auctionPort, AutoBidRepositoryPort autoBidPort,
+                                                BidRepositoryPort bidPort, BidBroadcastPort bidBroadcastPort,
+                                                EventPublisherPort eventPublisherPort) {
+        return new SetAutoBidUseCase(auctionPort, autoBidPort, bidPort, bidBroadcastPort, eventPublisherPort);
     }
 
     @Bean

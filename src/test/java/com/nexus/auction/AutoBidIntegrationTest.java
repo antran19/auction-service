@@ -1,6 +1,7 @@
 package com.nexus.auction;
 
 import com.nexus.auction.application.usecase.PlaceBidUseCase;
+import com.nexus.auction.application.usecase.SetAutoBidUseCase;
 import com.nexus.common.core.exception.ValidationException;
 import com.nexus.common.security.JwtTokenProvider;
 import org.junit.jupiter.api.Test;
@@ -56,6 +57,7 @@ class AutoBidIntegrationTest {
     @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private JwtTokenProvider jwtTokenProvider;
     @Autowired private PlaceBidUseCase placeBidUseCase;
+    @Autowired private SetAutoBidUseCase setAutoBidUseCase;
 
     private String seedAuction() {
         UUID id = UUID.randomUUID();
@@ -182,5 +184,61 @@ class AutoBidIntegrationTest {
         assertThat(auctionRow(auctionId).get("current_highest_bidder_id")).isEqualTo("an");
         assertThat((BigDecimal) auctionRow(auctionId).get("current_highest_bid"))
                 .isEqualByComparingTo(highestManual.add(new BigDecimal(10)));
+    }
+
+    // ---- setting a maximum places bids straight away
+
+    private void setMax(String auctionId, String bidder, int max) {
+        setAutoBidUseCase.setAutoBid(auctionId, bidder, new BigDecimal(max), "TRUSTED");
+    }
+
+    private List<String> historyOf(String auctionId) {
+        return jdbcTemplate.queryForList("SELECT bidder_id || ':' || trunc(amount)::text FROM bids WHERE auction_id = ? ORDER BY amount",
+                String.class, UUID.fromString(auctionId));
+    }
+
+    @Test
+    void aFirstMaximum_placesTheStartingPriceBid_andLeads() {
+        String auctionId = seedAuction();
+
+        setMax(auctionId, "an", 500);
+
+        assertThat(historyOf(auctionId)).containsExactly("an:100");
+        assertThat(auctionRow(auctionId).get("current_highest_bidder_id")).isEqualTo("an");
+        assertThat((BigDecimal) auctionRow(auctionId).get("current_highest_bid")).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void aLowerMaximum_isBeatenByTheLeader_andTheLeaderPaysOneIncrementAboveIt() {
+        String auctionId = seedAuction();
+        setMax(auctionId, "an", 500);
+
+        setMax(auctionId, "binh", 300);
+
+        assertThat(historyOf(auctionId)).containsExactly("an:100", "binh:300", "an:310");
+        assertThat(auctionRow(auctionId).get("current_highest_bidder_id")).isEqualTo("an");
+    }
+
+    @Test
+    void aHigherMaximumWithinOneIncrement_wins_atItsOwnMaximum_andTheHistoryStaysOneIncrementApart() {
+        String auctionId = seedAuction();
+        setMax(auctionId, "an", 500);
+
+        setMax(auctionId, "chi", 505);
+
+        assertThat(historyOf(auctionId)).containsExactly("an:100", "an:495", "chi:505");
+        assertThat(auctionRow(auctionId).get("current_highest_bidder_id")).isEqualTo("chi");
+        assertThat((BigDecimal) auctionRow(auctionId).get("current_highest_bid")).isEqualByComparingTo("505.00");
+    }
+
+    @Test
+    void raisingTheOwnMaximumWhileLeading_changesNothingVisible() {
+        String auctionId = seedAuction();
+        setMax(auctionId, "an", 500);
+
+        setMax(auctionId, "an", 800);
+
+        assertThat(historyOf(auctionId)).containsExactly("an:100");
+        assertThat((BigDecimal) auctionRow(auctionId).get("current_highest_bid")).isEqualByComparingTo("100.00");
     }
 }
