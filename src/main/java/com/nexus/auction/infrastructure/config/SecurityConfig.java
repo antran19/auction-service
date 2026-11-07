@@ -44,6 +44,10 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .exceptionHandling(handling -> handling.authenticationEntryPoint(authenticationEntryPoint))
             .authorizeHttpRequests(auth -> auth
+                    // Personal reads: listed before the public GETs (first match wins), so that someone
+                    // without a token is told 401 rather than 403 by the privilege check.
+                    .requestMatchers(HttpMethod.GET, "/api/v1/auctions/mine/**", "/api/v1/auctions/*/auto-bid")
+                            .authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/**").permitAll()
                     .requestMatchers("/actuator/**").permitAll()
                     .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()

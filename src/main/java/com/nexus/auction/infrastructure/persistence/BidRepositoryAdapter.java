@@ -1,11 +1,14 @@
 package com.nexus.auction.infrastructure.persistence;
 
 import com.nexus.auction.application.port.out.BidRepositoryPort;
+import com.nexus.auction.application.port.out.BidderAuctionSummary;
 import com.nexus.auction.domain.model.Bid;
 import com.nexus.auction.infrastructure.persistence.entity.BidJpaEntity;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,6 +35,13 @@ public class BidRepositoryAdapter implements BidRepositoryPort {
                 .map(uuid -> jpaRepository.findByAuctionIdOrderByPlacedAtDesc(uuid, PageRequest.of(page, size))
                         .stream().map(this::toDomain).toList())
                 .orElse(List.of());
+    }
+
+    @Override
+    public List<BidderAuctionSummary> findAuctionsBidOnBy(String bidderId, int page, int size) {
+        return jpaRepository.summarizeByBidder(bidderId, PageRequest.of(page, size)).stream()
+                .map(row -> new BidderAuctionSummary(row[0].toString(), (BigDecimal) row[1], (Instant) row[2]))
+                .toList();
     }
 
     private Bid toDomain(BidJpaEntity e) {

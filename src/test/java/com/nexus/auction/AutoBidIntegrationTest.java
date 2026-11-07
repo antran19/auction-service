@@ -331,4 +331,91 @@ class AutoBidIntegrationTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(((Map) response.getBody().get("error")).get("code")).isEqualTo("SELLER_CANNOT_BID_OWN_AUCTION");
     }
+
+    // ---- reading it back, over HTTP
+
+    @SuppressWarnings("rawtypes")
+    private ResponseEntity<Map> get(String path, String user, String... privileges) {
+        HttpHeaders headers = new HttpHeaders();
+        if (user != null) {
+            headers.setBearerAuth(jwtTokenProvider.generateToken(user, "BUYER", List.of(privileges), "TRUSTED"));
+        }
+        return rest.exchange(path, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+    }
+
+    @SuppressWarnings("rawtypes")
+    @Test
+    void getAutoBid_returnsMyOwnMaximum_andOnlyMine() {
+        String auctionId = seedAuction();
+        put(auctionId, "an", 500, true);
+        put(auctionId, "binh", 700, true);
+
+        ResponseEntity<Map> mine = get("/api/v1/auctions/" + auctionId + "/auto-bid", "an", "AUCTION.BID");
+
+        assertThat(mine.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(((Map) mine.getBody().get("data")).get("bidderId")).isEqualTo("an");
+        assertThat(new BigDecimal(((Map) mine.getBody().get("data")).get("maxAmount").toString()))
+                .isEqualByComparingTo("500.00");
+    }
+
+    @SuppressWarnings("rawtypes")
+    @Test
+    void getAutoBid_404WithItsOwnCode_whenIHaveNone_andAuctionNotFoundForAnUnknownAuction() {
+        String auctionId = seedAuction();
+
+        ResponseEntity<Map> none = get("/api/v1/auctions/" + auctionId + "/auto-bid", "an", "AUCTION.BID");
+        ResponseEntity<Map> unknown = get("/api/v1/auctions/" + UUID.randomUUID() + "/auto-bid", "an", "AUCTION.BID");
+
+        assertThat(none.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(((Map) none.getBody().get("error")).get("code")).isEqualTo("AUTO_BID_NOT_FOUND");
+        assertThat(unknown.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(((Map) unknown.getBody().get("error")).get("code")).isEqualTo("AUCTION_NOT_FOUND");
+    }
+
+    @SuppressWarnings("rawtypes")
+    @Test
+    void getAutoBid_withoutAToken_is401_andWithoutThePrivilege_is403() {
+        String auctionId = seedAuction();
+        String path = "/api/v1/auctions/" + auctionId + "/auto-bid";
+
+        assertThat(get(path, null).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(get(path, "an", "AUCTION.VIEW").getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    @Test
+    void myBidding_showsLeadingAndOutbid_withMyMaximum_forThePersonInTheToken() {
+        // a bidder of its own: the other tests in this class share the database
+        String me = "me-" + UUID.randomUUID();
+        String other = "other-" + UUID.randomUUID();
+        String leading = seedAuction();
+        String outbid = seedAuction();
+        put(leading, me, 500, true);
+        post(outbid, me, 100);
+        post(outbid, other, 120);
+
+        ResponseEntity<Map> response = get("/api/v1/auctions/mine/bidding", me, "AUCTION.BID");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<Map<String, Object>> items = (List<Map<String, Object>>) response.getBody().get("data");
+        assertThat(items).hasSize(2);
+        Map<String, Object> leadingItem = items.stream().filter(i -> leading.equals(i.get("auctionId"))).findFirst().orElseThrow();
+        Map<String, Object> outbidItem = items.stream().filter(i -> outbid.equals(i.get("auctionId"))).findFirst().orElseThrow();
+        assertThat(leadingItem.get("myStatus")).isEqualTo("LEADING");
+        assertThat(new BigDecimal(leadingItem.get("myMaxAutoBid").toString())).isEqualByComparingTo("500.00");
+        assertThat(outbidItem.get("myStatus")).isEqualTo("OUTBID");
+        assertThat(outbidItem.get("myMaxAutoBid")).isNull();
+    }
+
+    @SuppressWarnings("rawtypes")
+    @Test
+    void myBidding_isEmptyForSomeoneWhoNeverBid_andRefusedWithoutAToken() {
+        seedAuction();
+
+        ResponseEntity<Map> empty = get("/api/v1/auctions/mine/bidding", "nobody", "AUCTION.BID");
+
+        assertThat(empty.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat((List<?>) empty.getBody().get("data")).isEmpty();
+        assertThat(get("/api/v1/auctions/mine/bidding", null).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
 }

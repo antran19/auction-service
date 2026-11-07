@@ -2,7 +2,9 @@ package com.nexus.auction.api;
 
 import com.nexus.auction.application.exception.AuctionNotFoundException;
 import com.nexus.auction.application.usecase.AutoBidResult;
+import com.nexus.auction.application.usecase.GetMyAutoBidUseCase;
 import com.nexus.auction.application.usecase.SetAutoBidUseCase;
+import com.nexus.common.core.exception.NotFoundException;
 import com.nexus.auction.infrastructure.config.SecurityConfig;
 import com.nexus.common.core.exception.ConflictException;
 import com.nexus.common.core.exception.ForbiddenException;
@@ -32,6 +34,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -47,6 +50,7 @@ class AutoBidControllerTest {
     @Autowired private MockMvc mockMvc;
 
     @MockBean private SetAutoBidUseCase setAutoBidUseCase;
+    @MockBean private GetMyAutoBidUseCase getMyAutoBidUseCase;
     @MockBean private JwtTokenProvider jwtTokenProvider;
 
     private void authenticateAs(String subject, String... privileges) {
@@ -125,6 +129,38 @@ class AutoBidControllerTest {
                         .contentType(APPLICATION_JSON).content("{\"maxAmount\":500}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("INSUFFICIENT_TRUST_TO_BID"));
+    }
+
+    @Test
+    void getAutoBid_returns401WithoutToken_and403WithoutThePrivilege() throws Exception {
+        mockMvc.perform(get(URL)).andExpect(status().isUnauthorized());
+
+        authenticateAs("bidder-1", "AUCTION.VIEW");
+        mockMvc.perform(get(URL).header("Authorization", "Bearer good-token")).andExpect(status().isForbidden());
+        verify(getMyAutoBidUseCase, never()).get(anyString(), anyString());
+    }
+
+    @Test
+    void getAutoBid_returnsTheMaximumOfThePersonInTheToken() throws Exception {
+        authenticateAs("bidder-1", "AUCTION.BID");
+        when(getMyAutoBidUseCase.get("auction-1", "bidder-1"))
+                .thenReturn(new AutoBidResult("ab-1", "auction-1", "bidder-1", new BigDecimal("500.00"), Instant.now()));
+
+        mockMvc.perform(get(URL).header("Authorization", "Bearer good-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.bidderId").value("bidder-1"))
+                .andExpect(jsonPath("$.data.maxAmount").value(500.00));
+    }
+
+    @Test
+    void getAutoBid_returns404WithItsOwnCode_whenThereIsNone() throws Exception {
+        authenticateAs("bidder-1", "AUCTION.BID");
+        when(getMyAutoBidUseCase.get(anyString(), anyString()))
+                .thenThrow(new NotFoundException("AUTO_BID_NOT_FOUND", "none"));
+
+        mockMvc.perform(get(URL).header("Authorization", "Bearer good-token"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("AUTO_BID_NOT_FOUND"));
     }
 
     @Test

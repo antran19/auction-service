@@ -7,4 +7,8 @@ import java.util.List;
 public interface BidRepositoryPort {
     Bid save(Bid bid);
     List<Bid> findByAuctionId(String auctionId, int page, int size);
+
+    // The auctions this person has bid on, most recently active first. Bids the system placed for
+    // their maximum count too: they are bids under their name.
+    List<BidderAuctionSummary> findAuctionsBidOnBy(String bidderId, int page, int size);
 }

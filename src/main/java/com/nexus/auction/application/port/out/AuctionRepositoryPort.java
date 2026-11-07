@@ -9,6 +9,7 @@ import java.util.Optional;
 public interface AuctionRepositoryPort {
     Auction save(Auction auction);
     Optional<Auction> findById(String id);
+    List<Auction> findAllByIds(List<String> ids);
     Optional<Auction> findByIdForUpdate(String id);
     boolean existsActiveOrPendingForProduct(String productId);
     long countActiveOrPendingBySeller(String sellerId);

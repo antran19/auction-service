@@ -1,5 +1,6 @@
 package com.nexus.auction.infrastructure.persistence;
 
+import com.nexus.auction.application.port.out.BidderAuctionSummary;
 import com.nexus.auction.domain.model.Bid;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,6 +62,41 @@ class BidRepositoryAdapterTest {
 
         assertThat(bids).hasSize(2);
         assertThat(bids.get(0).getBidderId()).isEqualTo("bidder-2");
+    }
+
+    @Test
+    void findAuctionsBidOnBy_givesOneRowPerAuction_withMyHighestBid_mostRecentlyActiveFirst() throws InterruptedException {
+        String older = seedAuction();
+        String newer = seedAuction();
+        adapter.save(Bid.create(older, "me", new BigDecimal("100.00")));
+        adapter.save(Bid.create(older, "me", new BigDecimal("130.00")));
+        adapter.save(Bid.create(older, "other", new BigDecimal("200.00")));
+        Thread.sleep(5);
+        adapter.save(Bid.create(newer, "me", new BigDecimal("110.00")));
+
+        List<BidderAuctionSummary> rows = adapter.findAuctionsBidOnBy("me", 0, 10);
+
+        assertThat(rows).hasSize(2);
+        assertThat(rows.get(0).auctionId()).isEqualTo(newer);
+        assertThat(rows.get(0).myHighestBid()).isEqualByComparingTo("110.00");
+        assertThat(rows.get(1).auctionId()).isEqualTo(older);
+        // only my own bids count: the other person's 200 is not mine
+        assertThat(rows.get(1).myHighestBid()).isEqualByComparingTo("130.00");
+    }
+
+    @Test
+    void findAuctionsBidOnBy_isPaged_andEmptyForSomeoneWhoNeverBid() throws InterruptedException {
+        String first = seedAuction();
+        String second = seedAuction();
+        adapter.save(Bid.create(first, "me", new BigDecimal("100.00")));
+        Thread.sleep(5);
+        adapter.save(Bid.create(second, "me", new BigDecimal("100.00")));
+
+        assertThat(adapter.findAuctionsBidOnBy("me", 0, 1)).extracting(BidderAuctionSummary::auctionId)
+                .containsExactly(second);
+        assertThat(adapter.findAuctionsBidOnBy("me", 1, 1)).extracting(BidderAuctionSummary::auctionId)
+                .containsExactly(first);
+        assertThat(adapter.findAuctionsBidOnBy("nobody", 0, 10)).isEmpty();
     }
 
     @Test

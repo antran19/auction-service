@@ -40,6 +40,15 @@ public class AutoBidRepositoryAdapter implements AutoBidRepositoryPort {
                 .orElse(List.of());
     }
 
+    @Override
+    public List<AutoBid> findByBidderIdAndAuctionIds(String bidderId, List<String> auctionIds) {
+        List<UUID> uuids = auctionIds.stream().map(UuidIds::tryParse).flatMap(Optional::stream).toList();
+        if (uuids.isEmpty()) {
+            return List.of();
+        }
+        return jpaRepository.findByBidderIdAndAuctionIdIn(bidderId, uuids).stream().map(this::toDomain).toList();
+    }
+
     private AutoBid toDomain(AutoBidJpaEntity e) {
         return AutoBid.reconstitute(e.getId().toString(), e.getAuctionId().toString(), e.getBidderId(),
                 e.getMaxAmount(), e.getCreatedAt(), e.getUpdatedAt());

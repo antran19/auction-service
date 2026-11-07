@@ -53,6 +53,12 @@ public class AuctionRepositoryAdapter implements AuctionRepositoryPort {
     }
 
     @Override
+    public List<Auction> findAllByIds(List<String> ids) {
+        List<UUID> uuids = ids.stream().map(UuidIds::tryParse).flatMap(Optional::stream).toList();
+        return jpaRepository.findAllById(uuids).stream().map(this::toDomain).toList();
+    }
+
+    @Override
     public Optional<Auction> findByIdForUpdate(String id) {
         return UuidIds.tryParse(id).flatMap(jpaRepository::findByIdForUpdate).map(this::toDomain);
     }

@@ -3,6 +3,7 @@ package com.nexus.auction.api;
 import com.nexus.auction.api.dto.request.SetAutoBidRequest;
 import com.nexus.auction.api.dto.response.AutoBidResponse;
 import com.nexus.auction.application.usecase.AutoBidResult;
+import com.nexus.auction.application.usecase.GetMyAutoBidUseCase;
 import com.nexus.auction.application.usecase.SetAutoBidUseCase;
 import com.nexus.common.core.ApiResponse;
 import com.nexus.common.security.RequiresPrivilege;
@@ -10,6 +11,7 @@ import com.nexus.common.security.TokenDetails;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,9 +23,20 @@ import org.springframework.web.bind.annotation.RestController;
 public class AutoBidController {
 
     private final SetAutoBidUseCase setAutoBidUseCase;
+    private final GetMyAutoBidUseCase getMyAutoBidUseCase;
 
-    public AutoBidController(SetAutoBidUseCase setAutoBidUseCase) {
+    public AutoBidController(SetAutoBidUseCase setAutoBidUseCase, GetMyAutoBidUseCase getMyAutoBidUseCase) {
         this.setAutoBidUseCase = setAutoBidUseCase;
+        this.getMyAutoBidUseCase = getMyAutoBidUseCase;
+    }
+
+    // Only the owner can see a maximum: the bidder comes from the token, never from the request.
+    @RequiresPrivilege("AUCTION.BID")
+    @GetMapping
+    public ResponseEntity<ApiResponse<AutoBidResponse>> getMyAutoBid(Authentication authentication,
+                                                                      @PathVariable String auctionId) {
+        String bidderId = (String) authentication.getPrincipal();
+        return ResponseEntity.ok(ApiResponse.ok(AutoBidResponse.from(getMyAutoBidUseCase.get(auctionId, bidderId))));
     }
 
     // PUT because the call sets "my maximum on this auction": sending it again replaces it (a

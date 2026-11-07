@@ -10,4 +10,5 @@ import java.util.UUID;
 public interface AutoBidJpaRepository extends JpaRepository<AutoBidJpaEntity, UUID> {
     Optional<AutoBidJpaEntity> findByAuctionIdAndBidderId(UUID auctionId, String bidderId);
     List<AutoBidJpaEntity> findByAuctionIdOrderByCreatedAtAsc(UUID auctionId);
+    List<AutoBidJpaEntity> findByBidderIdAndAuctionIdIn(String bidderId, List<UUID> auctionIds);
 }
