@@ -5,11 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexus.auction.application.usecase.SyncProductSnapshotUseCase;
 import com.nexus.common.events.ProductCreatedEvent;
 import com.nexus.common.events.ProductStatusChangedEvent;
+import com.nexus.common.events.ProductUpdatedEvent;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
-// Feeds auction-service's copy of product owner and status, checked when an auction is created.
-// Other catalog events (renames, categories) are ignored.
+// Feeds auction-service's copy of product owner, status and name. Owner and status are checked when an
+// auction is created; the name is shown in the "auctions I bid in" list. Other catalog events are ignored.
 @Component
 public class CatalogEventsListener {
 
@@ -28,7 +29,10 @@ public class CatalogEventsListener {
         String eventType = objectMapper.readTree(rawPayload).path("eventType").asText();
         if ("ProductCreated".equals(eventType)) {
             ProductCreatedEvent e = objectMapper.readValue(rawPayload, ProductCreatedEvent.class);
-            syncProductSnapshotUseCase.onCreated(e.getProductId(), e.getSellerId());
+            syncProductSnapshotUseCase.onCreated(e.getProductId(), e.getSellerId(), e.getName());
+        } else if ("ProductUpdated".equals(eventType)) {
+            ProductUpdatedEvent e = objectMapper.readValue(rawPayload, ProductUpdatedEvent.class);
+            syncProductSnapshotUseCase.onRenamed(e.getProductId(), e.getName());
         } else if ("ProductStatusChanged".equals(eventType)) {
             ProductStatusChangedEvent e = objectMapper.readValue(rawPayload, ProductStatusChangedEvent.class);
             syncProductSnapshotUseCase.onStatusChanged(e.getProductId(), e.getNewStatus());

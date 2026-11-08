@@ -384,6 +384,28 @@ class AutoBidIntegrationTest {
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     @Test
+    void myBidding_carriesTheProductName_whenTheCatalogEventsGaveIt() {
+        String me = "me-" + UUID.randomUUID();
+        String named = seedAuction();
+        String unnamed = seedAuction();
+        UUID namedProduct = jdbcTemplate.queryForObject("SELECT product_id FROM auctions WHERE id = ?", UUID.class,
+                UUID.fromString(named));
+        jdbcTemplate.update("INSERT INTO product_snapshots (product_id, seller_id, status, name, updated_at) "
+                + "VALUES (?, 'seller-1', 'ACTIVE', 'Vintage Watch', now())", namedProduct.toString());
+        post(named, me, 100);
+        post(unnamed, me, 100);
+
+        ResponseEntity<Map> response = get("/api/v1/auctions/mine/bidding", me, "AUCTION.BID");
+
+        List<Map<String, Object>> items = (List<Map<String, Object>>) response.getBody().get("data");
+        Map<String, Object> namedItem = items.stream().filter(i -> named.equals(i.get("auctionId"))).findFirst().orElseThrow();
+        Map<String, Object> unnamedItem = items.stream().filter(i -> unnamed.equals(i.get("auctionId"))).findFirst().orElseThrow();
+        assertThat(namedItem.get("productName")).isEqualTo("Vintage Watch");
+        assertThat(unnamedItem.get("productName")).isNull();
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    @Test
     void myBidding_showsLeadingAndOutbid_withMyMaximum_forThePersonInTheToken() {
         // a bidder of its own: the other tests in this class share the database
         String me = "me-" + UUID.randomUUID();

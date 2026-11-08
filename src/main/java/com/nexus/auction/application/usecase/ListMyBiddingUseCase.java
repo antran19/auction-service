@@ -4,6 +4,7 @@ import com.nexus.auction.application.port.out.AuctionRepositoryPort;
 import com.nexus.auction.application.port.out.AutoBidRepositoryPort;
 import com.nexus.auction.application.port.out.BidRepositoryPort;
 import com.nexus.auction.application.port.out.BidderAuctionSummary;
+import com.nexus.auction.application.port.out.ProductSnapshotRepositoryPort;
 import com.nexus.auction.domain.model.Auction;
 import com.nexus.auction.domain.model.AutoBid;
 import com.nexus.common.core.FieldError;
@@ -25,12 +26,15 @@ public class ListMyBiddingUseCase {
     private final BidRepositoryPort bidRepositoryPort;
     private final AuctionRepositoryPort auctionRepositoryPort;
     private final AutoBidRepositoryPort autoBidRepositoryPort;
+    private final ProductSnapshotRepositoryPort productSnapshotRepositoryPort;
 
     public ListMyBiddingUseCase(BidRepositoryPort bidRepositoryPort, AuctionRepositoryPort auctionRepositoryPort,
-                                AutoBidRepositoryPort autoBidRepositoryPort) {
+                                AutoBidRepositoryPort autoBidRepositoryPort,
+                                ProductSnapshotRepositoryPort productSnapshotRepositoryPort) {
         this.bidRepositoryPort = bidRepositoryPort;
         this.auctionRepositoryPort = auctionRepositoryPort;
         this.autoBidRepositoryPort = autoBidRepositoryPort;
+        this.productSnapshotRepositoryPort = productSnapshotRepositoryPort;
     }
 
     public List<MyBiddingItem> list(String bidderId, int page, int size) {
@@ -56,6 +60,10 @@ public class ListMyBiddingUseCase {
         autoBidRepositoryPort.findByBidderIdAndAuctionIds(bidderId, auctionIds)
                 .forEach(autoBid -> autoBids.put(autoBid.getAuctionId(), autoBid));
 
+        // A product whose name is not known yet simply has none: the caller shows its own fallback.
+        Map<String, String> productNames = productSnapshotRepositoryPort.findNamesByIds(
+                auctions.values().stream().map(Auction::getProductId).distinct().toList());
+
         List<MyBiddingItem> items = new ArrayList<>();
         for (BidderAuctionSummary summary : summaries) {
             Auction auction = auctions.get(summary.auctionId());
@@ -63,7 +71,8 @@ public class ListMyBiddingUseCase {
                 continue;
             }
             AutoBid autoBid = autoBids.get(summary.auctionId());
-            items.add(new MyBiddingItem(auction.getId(), auction.getProductId(), auction.getStatus().name(),
+            items.add(new MyBiddingItem(auction.getId(), auction.getProductId(),
+                    productNames.get(auction.getProductId()), auction.getStatus().name(),
                     myStatus(auction, bidderId), auction.getEndTime(), auction.getCurrentHighestBid(),
                     summary.myHighestBid(), autoBid == null ? null : autoBid.getMaxAmount()));
         }

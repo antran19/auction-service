@@ -11,9 +11,10 @@ import java.time.Instant;
 public interface ProductSnapshotJpaRepository extends JpaRepository<ProductSnapshotJpaEntity, String> {
 
     @Modifying
-    @Query(value = "INSERT INTO product_snapshots (product_id, seller_id, status, updated_at) "
-            + "VALUES (:productId, :sellerId, :status, :updatedAt) "
+    @Query(value = "INSERT INTO product_snapshots (product_id, seller_id, status, name, updated_at) "
+            + "VALUES (:productId, :sellerId, :status, :name, :updatedAt) "
             + "ON CONFLICT (product_id) DO NOTHING", nativeQuery = true)
     void insertIfAbsent(@Param("productId") String productId, @Param("sellerId") String sellerId,
-                        @Param("status") String status, @Param("updatedAt") Instant updatedAt);
+                        @Param("status") String status, @Param("name") String name,
+                        @Param("updatedAt") Instant updatedAt);
 }

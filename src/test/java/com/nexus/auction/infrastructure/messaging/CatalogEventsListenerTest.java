@@ -20,7 +20,7 @@ class CatalogEventsListenerTest {
                 + "\"aggregateId\":\"product-1\",\"productId\":\"product-1\",\"name\":\"Watch\",\"categoryId\":\"c\","
                 + "\"sellerId\":\"seller-1\",\"initialStock\":1,\"price\":10}");
 
-        verify(syncProductSnapshotUseCase).onCreated("product-1", "seller-1");
+        verify(syncProductSnapshotUseCase).onCreated("product-1", "seller-1", "Watch");
     }
 
     @Test
@@ -32,9 +32,17 @@ class CatalogEventsListenerTest {
     }
 
     @Test
-    void onMessage_otherEvents_areIgnored() throws Exception {
+    void onMessage_productUpdated_recordsTheNewName() throws Exception {
         listener.onMessage("{\"eventId\":\"e-3\",\"eventType\":\"ProductUpdated\",\"occurredAt\":\"2026-01-01T00:00:00Z\","
                 + "\"aggregateId\":\"product-1\",\"productId\":\"product-1\",\"name\":\"New\"}");
+
+        verify(syncProductSnapshotUseCase).onRenamed("product-1", "New");
+    }
+
+    @Test
+    void onMessage_otherEvents_areIgnored() throws Exception {
+        listener.onMessage("{\"eventId\":\"e-4\",\"eventType\":\"CategoryCreated\",\"occurredAt\":\"2026-01-01T00:00:00Z\","
+                + "\"aggregateId\":\"c-1\"}");
 
         verifyNoInteractions(syncProductSnapshotUseCase);
     }

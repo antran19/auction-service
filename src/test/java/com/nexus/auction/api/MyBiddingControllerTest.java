@@ -70,12 +70,13 @@ class MyBiddingControllerTest {
     void returnsTheListOfThePersonInTheToken_withDefaultPaging() throws Exception {
         authenticateAs("bidder-1", "AUCTION.BID");
         when(listMyBiddingUseCase.list("bidder-1", 0, 20)).thenReturn(List.of(
-                new MyBiddingItem("auction-1", "product-1", "ACTIVE", "LEADING", Instant.parse("2030-01-01T00:00:00Z"),
+                new MyBiddingItem("auction-1", "product-1", "Watch", "ACTIVE", "LEADING", Instant.parse("2030-01-01T00:00:00Z"),
                         new BigDecimal("130.00"), new BigDecimal("130.00"), new BigDecimal("500.00"))));
 
         mockMvc.perform(get(URL).header("Authorization", "Bearer good-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].auctionId").value("auction-1"))
+                .andExpect(jsonPath("$.data[0].productName").value("Watch"))
                 .andExpect(jsonPath("$.data[0].myStatus").value("LEADING"))
                 .andExpect(jsonPath("$.data[0].myMaxAutoBid").value(500.00));
     }

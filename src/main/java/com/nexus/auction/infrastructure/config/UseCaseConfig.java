@@ -83,8 +83,9 @@ public class UseCaseConfig {
 
     @Bean
     public ListMyBiddingUseCase listMyBiddingUseCase(BidRepositoryPort bidPort, AuctionRepositoryPort auctionPort,
-                                                      AutoBidRepositoryPort autoBidPort) {
-        return new ListMyBiddingUseCase(bidPort, auctionPort, autoBidPort);
+                                                      AutoBidRepositoryPort autoBidPort,
+                                                      ProductSnapshotRepositoryPort productSnapshotPort) {
+        return new ListMyBiddingUseCase(bidPort, auctionPort, autoBidPort, productSnapshotPort);
     }
 
     @Bean

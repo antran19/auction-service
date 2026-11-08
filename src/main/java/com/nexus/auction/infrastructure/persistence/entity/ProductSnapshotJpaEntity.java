@@ -21,21 +21,26 @@ public class ProductSnapshotJpaEntity {
     @Column(name = "status", nullable = false)
     private String status;
 
+    @Column(name = "name")
+    private String name;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
     protected ProductSnapshotJpaEntity() {
     }
 
-    public ProductSnapshotJpaEntity(String productId, String sellerId, String status, Instant updatedAt) {
+    public ProductSnapshotJpaEntity(String productId, String sellerId, String status, String name, Instant updatedAt) {
         this.productId = productId;
         this.sellerId = sellerId;
         this.status = status;
+        this.name = name;
         this.updatedAt = updatedAt;
     }
 
     public String getProductId() { return productId; }
     public String getSellerId() { return sellerId; }
     public String getStatus() { return status; }
+    public String getName() { return name; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

@@ -9,24 +9,39 @@ public class AuctionProduct {
     private final String productId;
     private final String sellerId;
     private final String status;
+    // null until the catalog tells us (rows older than the name column)
+    private final String name;
 
-    private AuctionProduct(String productId, String sellerId, String status) {
+    private AuctionProduct(String productId, String sellerId, String status, String name) {
         this.productId = productId;
         this.sellerId = sellerId;
         this.status = status;
+        this.name = name;
     }
 
     // Catalog creates every product as DRAFT.
     public static AuctionProduct create(String productId, String sellerId) {
-        return new AuctionProduct(productId, sellerId, "DRAFT");
+        return create(productId, sellerId, null);
+    }
+
+    public static AuctionProduct create(String productId, String sellerId, String name) {
+        return new AuctionProduct(productId, sellerId, "DRAFT", name);
     }
 
     public static AuctionProduct reconstitute(String productId, String sellerId, String status) {
-        return new AuctionProduct(productId, sellerId, status);
+        return reconstitute(productId, sellerId, status, null);
+    }
+
+    public static AuctionProduct reconstitute(String productId, String sellerId, String status, String name) {
+        return new AuctionProduct(productId, sellerId, status, name);
     }
 
     public AuctionProduct withStatus(String newStatus) {
-        return new AuctionProduct(productId, sellerId, newStatus);
+        return new AuctionProduct(productId, sellerId, newStatus, name);
+    }
+
+    public AuctionProduct withName(String newName) {
+        return new AuctionProduct(productId, sellerId, status, newName);
     }
 
     public boolean isAuctionable() {
@@ -40,4 +55,5 @@ public class AuctionProduct {
     public String getProductId() { return productId; }
     public String getSellerId() { return sellerId; }
     public String getStatus() { return status; }
+    public String getName() { return name; }
 }

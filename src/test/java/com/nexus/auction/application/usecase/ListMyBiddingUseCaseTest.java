@@ -4,6 +4,7 @@ import com.nexus.auction.application.port.out.AuctionRepositoryPort;
 import com.nexus.auction.application.port.out.AutoBidRepositoryPort;
 import com.nexus.auction.application.port.out.BidRepositoryPort;
 import com.nexus.auction.application.port.out.BidderAuctionSummary;
+import com.nexus.auction.application.port.out.ProductSnapshotRepositoryPort;
 import com.nexus.auction.domain.model.Auction;
 import com.nexus.auction.domain.model.AuctionStatus;
 import com.nexus.auction.domain.model.AutoBid;
@@ -15,9 +16,11 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -31,6 +34,7 @@ class ListMyBiddingUseCaseTest {
     private BidRepositoryPort bidRepositoryPort;
     private AuctionRepositoryPort auctionRepositoryPort;
     private AutoBidRepositoryPort autoBidRepositoryPort;
+    private ProductSnapshotRepositoryPort productSnapshotRepositoryPort;
     private ListMyBiddingUseCase useCase;
 
     @BeforeEach
@@ -38,7 +42,10 @@ class ListMyBiddingUseCaseTest {
         bidRepositoryPort = mock(BidRepositoryPort.class);
         auctionRepositoryPort = mock(AuctionRepositoryPort.class);
         autoBidRepositoryPort = mock(AutoBidRepositoryPort.class);
-        useCase = new ListMyBiddingUseCase(bidRepositoryPort, auctionRepositoryPort, autoBidRepositoryPort);
+        productSnapshotRepositoryPort = mock(ProductSnapshotRepositoryPort.class);
+        useCase = new ListMyBiddingUseCase(bidRepositoryPort, auctionRepositoryPort, autoBidRepositoryPort,
+                productSnapshotRepositoryPort);
+        when(productSnapshotRepositoryPort.findNamesByIds(anyCollection())).thenReturn(Map.of());
         when(autoBidRepositoryPort.findByBidderIdAndAuctionIds(anyString(), anyList())).thenReturn(List.of());
     }
 
@@ -110,6 +117,32 @@ class ListMyBiddingUseCaseTest {
 
         assertThat(items.get(0).myMaxAutoBid()).isEqualByComparingTo("500.00");
         assertThat(items.get(1).myMaxAutoBid()).isNull();
+    }
+
+    @Test
+    void theProductNameComesFromTheSnapshot_andIsNullWhereNotKnownYet() {
+        Auction named = auction(AuctionStatus.ACTIVE, "me", null, "130.00");
+        Auction unnamed = Auction.create("product-2", "seller-1", new BigDecimal("100.00"), new BigDecimal("10.00"),
+                Instant.now().minus(1, ChronoUnit.HOURS), Instant.now().plus(1, ChronoUnit.HOURS))
+                .withStatus(AuctionStatus.ACTIVE).withBid("me", new BigDecimal("120.00"));
+        bidOn("me", named, unnamed);
+        when(productSnapshotRepositoryPort.findNamesByIds(anyCollection())).thenReturn(Map.of("product-1", "Watch"));
+
+        List<MyBiddingItem> items = useCase.list("me", 0, 20);
+
+        assertThat(items.get(0).productName()).isEqualTo("Watch");
+        assertThat(items.get(1).productName()).isNull();
+    }
+
+    @Test
+    void theNamesAreAskedForOncePerProduct_notOncePerAuction() {
+        Auction a = auction(AuctionStatus.ACTIVE, "me", null, "130.00");
+        Auction b = auction(AuctionStatus.ACTIVE, "someone", null, "140.00");
+        bidOn("me", a, b);
+
+        useCase.list("me", 0, 20);
+
+        verify(productSnapshotRepositoryPort).findNamesByIds(List.of("product-1"));
     }
 
     @Test
