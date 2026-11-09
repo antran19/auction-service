@@ -21,6 +21,7 @@ import com.nexus.auction.application.usecase.MarkAuctionPaidUseCase;
 import com.nexus.auction.application.usecase.PlaceBidUseCase;
 import com.nexus.auction.application.usecase.GetMyAutoBidUseCase;
 import com.nexus.auction.application.usecase.ListMyBiddingUseCase;
+import com.nexus.auction.application.usecase.ListMySellingUseCase;
 import com.nexus.auction.application.usecase.SetAutoBidUseCase;
 import com.nexus.auction.application.usecase.StartAuctionUseCase;
 import com.nexus.auction.application.usecase.SyncProductSnapshotUseCase;
@@ -86,6 +87,12 @@ public class UseCaseConfig {
                                                       AutoBidRepositoryPort autoBidPort,
                                                       ProductSnapshotRepositoryPort productSnapshotPort) {
         return new ListMyBiddingUseCase(bidPort, auctionPort, autoBidPort, productSnapshotPort);
+    }
+
+    @Bean
+    public ListMySellingUseCase listMySellingUseCase(AuctionRepositoryPort auctionPort, BidRepositoryPort bidPort,
+                                                      ProductSnapshotRepositoryPort productSnapshotPort) {
+        return new ListMySellingUseCase(auctionPort, bidPort, productSnapshotPort);
     }
 
     @Bean

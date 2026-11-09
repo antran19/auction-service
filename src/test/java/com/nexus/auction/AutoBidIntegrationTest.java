@@ -69,6 +69,16 @@ class AutoBidIntegrationTest {
         return id.toString();
     }
 
+    private String seedAuctionOf(String seller, String status) {
+        UUID id = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO auctions (id, product_id, seller_id, starting_price, bid_increment, status,
+                                       start_time, end_time)
+                VALUES (?, ?, ?, 100.00, 10.00, ?, now() - interval '1 hour', now() + interval '1 hour')
+                """, id, UUID.randomUUID(), seller, status);
+        return id.toString();
+    }
+
     private void seedAutoBid(String auctionId, String bidder, int max) {
         jdbcTemplate.update("INSERT INTO auto_bids (id, auction_id, bidder_id, max_amount) VALUES (?, ?, ?, ?)",
                 UUID.randomUUID(), UUID.fromString(auctionId), bidder, new BigDecimal(max));
@@ -380,6 +390,49 @@ class AutoBidIntegrationTest {
 
         assertThat(get(path, null).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(get(path, "an", "AUCTION.VIEW").getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    @Test
+    void mySelling_listsOnlyTheSellersOwnAuctions_withBidAndBidderCounts() {
+        String seller = "seller-" + UUID.randomUUID();
+        String mine = seedAuctionOf(seller, "ACTIVE");
+        String mineEnded = seedAuctionOf(seller, "ENDED");
+        String notMine = seedAuctionOf("seller-" + UUID.randomUUID(), "ACTIVE");
+        post(mine, "bidder-" + UUID.randomUUID(), 100);
+        post(mine, "bidder-" + UUID.randomUUID(), 120);
+        post(notMine, "bidder-" + UUID.randomUUID(), 100);
+
+        ResponseEntity<Map> all = sellerGet("/api/v1/auctions/mine/selling", seller);
+        ResponseEntity<Map> endedOnly = sellerGet("/api/v1/auctions/mine/selling?status=ended", seller);
+
+        assertThat(all.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<Map<String, Object>> items = (List<Map<String, Object>>) all.getBody().get("data");
+        assertThat(items).extracting(i -> i.get("auctionId")).containsExactlyInAnyOrder(mine, mineEnded);
+        Map<String, Object> mineItem = items.stream().filter(i -> mine.equals(i.get("auctionId"))).findFirst().orElseThrow();
+        assertThat(((Number) mineItem.get("bidCount")).intValue()).isEqualTo(2);
+        assertThat(((Number) mineItem.get("bidderCount")).intValue()).isEqualTo(2);
+        Map<String, Object> endedItem = items.stream().filter(i -> mineEnded.equals(i.get("auctionId"))).findFirst().orElseThrow();
+        assertThat(((Number) endedItem.get("bidCount")).intValue()).isZero();
+        List<Map<String, Object>> endedItems = (List<Map<String, Object>>) endedOnly.getBody().get("data");
+        assertThat(endedItems).extracting(i -> i.get("auctionId")).containsExactly(mineEnded);
+    }
+
+    @SuppressWarnings("rawtypes")
+    @Test
+    void mySelling_isRefusedWithoutAToken_andForABidderWhoCannotCreateAuctions_andABadStatusIs400() {
+        String seller = "seller-" + UUID.randomUUID();
+
+        assertThat(get("/api/v1/auctions/mine/selling", null).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(get("/api/v1/auctions/mine/selling", "bidder-1", "AUCTION.BID").getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(sellerGet("/api/v1/auctions/mine/selling?status=BOGUS", seller).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @SuppressWarnings("rawtypes")
+    private ResponseEntity<Map> sellerGet(String path, String seller) {
+        return get(path, seller, "AUCTION.CREATE");
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

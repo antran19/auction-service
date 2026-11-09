@@ -1,6 +1,7 @@
 package com.nexus.auction.infrastructure.persistence;
 
 import com.nexus.auction.application.port.out.BidRepositoryPort;
+import com.nexus.auction.application.port.out.AuctionBidStats;
 import com.nexus.auction.application.port.out.BidderAuctionSummary;
 import com.nexus.auction.domain.model.Bid;
 import com.nexus.auction.infrastructure.persistence.entity.BidJpaEntity;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -41,6 +43,17 @@ public class BidRepositoryAdapter implements BidRepositoryPort {
     public List<BidderAuctionSummary> findAuctionsBidOnBy(String bidderId, int page, int size) {
         return jpaRepository.summarizeByBidder(bidderId, PageRequest.of(page, size)).stream()
                 .map(row -> new BidderAuctionSummary(row[0].toString(), (BigDecimal) row[1], (Instant) row[2]))
+                .toList();
+    }
+
+    @Override
+    public List<AuctionBidStats> statsByAuctionIds(List<String> auctionIds) {
+        List<UUID> uuids = auctionIds.stream().map(UuidIds::tryParse).flatMap(Optional::stream).toList();
+        if (uuids.isEmpty()) {
+            return List.of();
+        }
+        return jpaRepository.statsByAuctionIds(uuids).stream()
+                .map(row -> new AuctionBidStats(row[0].toString(), ((Number) row[1]).longValue(), ((Number) row[2]).longValue()))
                 .toList();
     }
 

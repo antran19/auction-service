@@ -1,5 +1,6 @@
 package com.nexus.auction.infrastructure.persistence;
 
+import com.nexus.auction.application.port.out.AuctionBidStats;
 import com.nexus.auction.application.port.out.BidderAuctionSummary;
 import com.nexus.auction.domain.model.Bid;
 import org.junit.jupiter.api.Test;
@@ -97,6 +98,33 @@ class BidRepositoryAdapterTest {
         assertThat(adapter.findAuctionsBidOnBy("me", 1, 1)).extracting(BidderAuctionSummary::auctionId)
                 .containsExactly(first);
         assertThat(adapter.findAuctionsBidOnBy("nobody", 0, 10)).isEmpty();
+    }
+
+    @Test
+    void statsByAuctionIds_countsBidsAndDifferentBidders_perAuction_andLeavesOutAuctionsWithoutBids() {
+        String busy = seedAuction();
+        String quiet = seedAuction();
+        String empty = seedAuction();
+        adapter.save(Bid.create(busy, "a", new BigDecimal("100.00")));
+        adapter.save(Bid.create(busy, "b", new BigDecimal("110.00")));
+        adapter.save(Bid.create(busy, "a", new BigDecimal("120.00")));
+        adapter.save(Bid.create(quiet, "a", new BigDecimal("100.00")));
+
+        List<AuctionBidStats> stats = adapter.statsByAuctionIds(List.of(busy, quiet, empty, "not-a-uuid"));
+
+        assertThat(stats).hasSize(2);
+        AuctionBidStats busyStats = stats.stream().filter(s -> s.auctionId().equals(busy)).findFirst().orElseThrow();
+        AuctionBidStats quietStats = stats.stream().filter(s -> s.auctionId().equals(quiet)).findFirst().orElseThrow();
+        assertThat(busyStats.bidCount()).isEqualTo(3);
+        assertThat(busyStats.bidderCount()).isEqualTo(2);
+        assertThat(quietStats.bidCount()).isEqualTo(1);
+        assertThat(quietStats.bidderCount()).isEqualTo(1);
+    }
+
+    @Test
+    void statsByAuctionIds_isEmptyForNoIdsOrOnlyMalformedOnes() {
+        assertThat(adapter.statsByAuctionIds(List.of())).isEmpty();
+        assertThat(adapter.statsByAuctionIds(List.of("not-a-uuid"))).isEmpty();
     }
 
     @Test
