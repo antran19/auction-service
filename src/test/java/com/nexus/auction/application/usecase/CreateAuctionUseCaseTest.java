@@ -62,6 +62,42 @@ class CreateAuctionUseCaseTest {
         verify(eventPublisherPort).publish(any());
     }
 
+    private CreateAuctionCommand commandWithReserve(String reserve) {
+        Instant start = Instant.now().plus(1, ChronoUnit.HOURS);
+        return new CreateAuctionCommand("product-1", "seller-1", new BigDecimal("100.00"), new BigDecimal("10.00"),
+                reserve == null ? null : new BigDecimal(reserve), start, start.plus(2, ChronoUnit.HOURS), "TRUSTED");
+    }
+
+    @Test
+    void create_storesTheReserve_andTheResultOnlySaysThereIsOne() {
+        AuctionResult result = useCase.create(commandWithReserve("300.00"));
+
+        verify(auctionRepositoryPort).save(argThat(a -> a.getReservePrice().compareTo(new BigDecimal("300.00")) == 0));
+        assertThat(result.hasReserve()).isTrue();
+        assertThat(result.reserveMet()).isFalse();
+    }
+
+    @Test
+    void create_withoutAReserve_hasNone_andItCountsAsMet() {
+        AuctionResult result = useCase.create(commandWithReserve(null));
+
+        assertThat(result.hasReserve()).isFalse();
+        assertThat(result.reserveMet()).isTrue();
+    }
+
+    @Test
+    void create_aReserveEqualToTheStartingPrice_isAllowed() {
+        assertThat(useCase.create(commandWithReserve("100.00")).hasReserve()).isTrue();
+    }
+
+    @Test
+    void create_aReserveBelowTheStartingPrice_isRejectedOnItsOwnField() {
+        assertThatThrownBy(() -> useCase.create(commandWithReserve("99.99")))
+                .isInstanceOfSatisfying(ValidationException.class, e ->
+                        assertThat(e.getFieldErrors()).extracting(f -> f.field()).containsExactly("reservePrice"));
+        verify(auctionRepositoryPort, never()).save(any());
+    }
+
     @Test
     void create_rejectsEndTimeBeforeStartTime() {
         Instant start = Instant.now().plus(1, ChronoUnit.HOURS);

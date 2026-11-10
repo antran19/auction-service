@@ -66,7 +66,8 @@ public class ListMySellingUseCase {
             return new MySellingItem(a.getId(), a.getProductId(), productNames.get(a.getProductId()),
                     a.getStatus().name(), a.getStartingPrice(), a.getBidIncrement(), a.getCurrentHighestBid(),
                     a.getStartTime(), a.getEndTime(), s == null ? 0 : s.bidCount(), s == null ? 0 : s.bidderCount(),
-                    a.getWinnerId(), a.getFinalPrice(), a.getPaymentDeadline(), a.getPaidAt());
+                    a.getWinnerId(), a.getFinalPrice(), a.getPaymentDeadline(), a.getPaidAt(), a.getReservePrice(),
+                    a.isReserveMet());
         }).toList();
     }
 }

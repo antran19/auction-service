@@ -73,14 +73,16 @@ class MySellingControllerTest {
         when(listMySellingUseCase.list("seller-1", null, 0, 20)).thenReturn(List.of(
                 new MySellingItem("auction-1", "product-1", "Watch", "ACTIVE", new BigDecimal("100.00"),
                         new BigDecimal("10.00"), new BigDecimal("130.00"), Instant.parse("2030-01-01T00:00:00Z"),
-                        Instant.parse("2030-01-02T00:00:00Z"), 7, 3, null, null, null, null)));
+                        Instant.parse("2030-01-02T00:00:00Z"), 7, 3, null, null, null, null, new BigDecimal("200.00"), false)));
 
         mockMvc.perform(get(URL).header("Authorization", "Bearer good-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].auctionId").value("auction-1"))
                 .andExpect(jsonPath("$.data[0].productName").value("Watch"))
                 .andExpect(jsonPath("$.data[0].bidCount").value(7))
-                .andExpect(jsonPath("$.data[0].bidderCount").value(3));
+                .andExpect(jsonPath("$.data[0].bidderCount").value(3))
+                .andExpect(jsonPath("$.data[0].reservePrice").value(200.00))
+                .andExpect(jsonPath("$.data[0].reserveMet").value(false));
     }
 
     @Test

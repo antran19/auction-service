@@ -51,7 +51,8 @@ public class AuctionController {
         String sellerId = callerId(authentication);
         String trustLevel = authentication.getDetails() instanceof TokenDetails details ? details.trustLevel() : null;
         CreateAuctionCommand command = new CreateAuctionCommand(request.productId(), sellerId,
-                request.startingPrice(), request.bidIncrement(), request.startTime(), request.endTime(), trustLevel);
+                request.startingPrice(), request.bidIncrement(), request.reservePrice(), request.startTime(),
+                request.endTime(), trustLevel);
         AuctionResult result = createAuctionUseCase.create(command);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(mapper.toResponse(result)));
     }
@@ -62,7 +63,7 @@ public class AuctionController {
                                                                  @PathVariable String id,
                                                                  @Valid @RequestBody UpdateAuctionRequest request) {
         AuctionResult result = updateAuctionUseCase.update(id, request.startingPrice(), request.bidIncrement(),
-                request.startTime(), request.endTime(), callerId(authentication));
+                request.reservePrice(), request.startTime(), request.endTime(), callerId(authentication));
         return ResponseEntity.ok(ApiResponse.ok(mapper.toResponse(result)));
     }
 

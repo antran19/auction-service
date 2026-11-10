@@ -9,6 +9,7 @@ import java.time.Instant;
 public record UpdateAuctionRequest(
         @NotNull @DecimalMin(value = "0.01", message = "startingPrice must be greater than zero") BigDecimal startingPrice,
         @NotNull @DecimalMin(value = "0.01", message = "bidIncrement must be greater than zero") BigDecimal bidIncrement,
+        @DecimalMin(value = "0.01", message = "reservePrice must be greater than zero") BigDecimal reservePrice,
         @NotNull Instant startTime,
         @NotNull Instant endTime) {
 }

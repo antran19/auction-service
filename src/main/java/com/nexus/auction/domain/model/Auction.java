@@ -13,6 +13,8 @@ public class Auction {
     private final String sellerId;
     private final BigDecimal startingPrice;
     private final BigDecimal bidIncrement;
+    // null: no reserve. Never exposed to bidders, only whether it has been met.
+    private final BigDecimal reservePrice;
     private final BigDecimal currentHighestBid;
     private final String currentHighestBidderId;
     private final AuctionStatus status;
@@ -28,7 +30,7 @@ public class Auction {
     private final Instant updatedAt;
 
     private Auction(String id, String productId, String sellerId, BigDecimal startingPrice,
-                     BigDecimal bidIncrement, BigDecimal currentHighestBid, String currentHighestBidderId,
+                     BigDecimal bidIncrement, BigDecimal reservePrice, BigDecimal currentHighestBid, String currentHighestBidderId,
                      AuctionStatus status, Instant startTime, Instant endTime, int extensionCount,
                      String winnerId, BigDecimal finalPrice, Instant paymentDeadline,
                      boolean paymentTimeoutEmitted, Instant paidAt, Instant createdAt, Instant updatedAt) {
@@ -37,6 +39,7 @@ public class Auction {
         this.sellerId = sellerId;
         this.startingPrice = startingPrice;
         this.bidIncrement = bidIncrement;
+        this.reservePrice = reservePrice;
         this.currentHighestBid = currentHighestBid;
         this.currentHighestBidderId = currentHighestBidderId;
         this.status = status;
@@ -54,8 +57,13 @@ public class Auction {
 
     public static Auction create(String productId, String sellerId, BigDecimal startingPrice,
                                   BigDecimal bidIncrement, Instant startTime, Instant endTime) {
+        return create(productId, sellerId, startingPrice, bidIncrement, null, startTime, endTime);
+    }
+
+    public static Auction create(String productId, String sellerId, BigDecimal startingPrice,
+                                  BigDecimal bidIncrement, BigDecimal reservePrice, Instant startTime, Instant endTime) {
         Instant now = Instant.now();
-        return new Auction(UUID.randomUUID().toString(), productId, sellerId, startingPrice, bidIncrement,
+        return new Auction(UUID.randomUUID().toString(), productId, sellerId, startingPrice, bidIncrement, reservePrice,
                 null, null, AuctionStatus.PENDING, startTime, endTime, 0, null, null, null, false, null, now, now);
     }
 
@@ -65,7 +73,18 @@ public class Auction {
                                         Instant endTime, int extensionCount, String winnerId, BigDecimal finalPrice,
                                         Instant paymentDeadline, boolean paymentTimeoutEmitted, Instant paidAt,
                                         Instant createdAt, Instant updatedAt) {
-        return new Auction(id, productId, sellerId, startingPrice, bidIncrement, currentHighestBid,
+        return reconstitute(id, productId, sellerId, startingPrice, bidIncrement, null, currentHighestBid,
+                currentHighestBidderId, status, startTime, endTime, extensionCount, winnerId, finalPrice,
+                paymentDeadline, paymentTimeoutEmitted, paidAt, createdAt, updatedAt);
+    }
+
+    public static Auction reconstitute(String id, String productId, String sellerId, BigDecimal startingPrice,
+                                        BigDecimal bidIncrement, BigDecimal reservePrice, BigDecimal currentHighestBid,
+                                        String currentHighestBidderId, AuctionStatus status, Instant startTime,
+                                        Instant endTime, int extensionCount, String winnerId, BigDecimal finalPrice,
+                                        Instant paymentDeadline, boolean paymentTimeoutEmitted, Instant paidAt,
+                                        Instant createdAt, Instant updatedAt) {
+        return new Auction(id, productId, sellerId, startingPrice, bidIncrement, reservePrice, currentHighestBid,
                 currentHighestBidderId, status, startTime, endTime, extensionCount, winnerId, finalPrice,
                 paymentDeadline, paymentTimeoutEmitted, paidAt, createdAt, updatedAt);
     }
@@ -76,46 +95,61 @@ public class Auction {
             throw new ConflictException("INVALID_AUCTION_TRANSITION",
                     "An auction cannot go from " + status + " to " + newStatus + ": " + id);
         }
-        return new Auction(id, productId, sellerId, startingPrice, bidIncrement, currentHighestBid,
+        return new Auction(id, productId, sellerId, startingPrice, bidIncrement, reservePrice, currentHighestBid,
                 currentHighestBidderId, newStatus, startTime, endTime, extensionCount, winnerId, finalPrice,
                 paymentDeadline, paymentTimeoutEmitted, paidAt, createdAt, Instant.now());
     }
 
     public Auction withDetails(BigDecimal newStartingPrice, BigDecimal newBidIncrement,
                                 Instant newStartTime, Instant newEndTime) {
-        return new Auction(id, productId, sellerId, newStartingPrice, newBidIncrement, currentHighestBid,
+        return withDetails(newStartingPrice, newBidIncrement, reservePrice, newStartTime, newEndTime);
+    }
+
+    public Auction withDetails(BigDecimal newStartingPrice, BigDecimal newBidIncrement, BigDecimal newReservePrice,
+                                Instant newStartTime, Instant newEndTime) {
+        return new Auction(id, productId, sellerId, newStartingPrice, newBidIncrement, newReservePrice, currentHighestBid,
                 currentHighestBidderId, status, newStartTime, newEndTime, extensionCount, winnerId, finalPrice,
                 paymentDeadline, paymentTimeoutEmitted, paidAt, createdAt, Instant.now());
     }
 
     public Auction withBid(String bidderId, BigDecimal amount) {
-        return new Auction(id, productId, sellerId, startingPrice, bidIncrement, amount, bidderId,
+        return new Auction(id, productId, sellerId, startingPrice, bidIncrement, reservePrice, amount, bidderId,
                 status, startTime, endTime, extensionCount, winnerId, finalPrice, paymentDeadline,
                 paymentTimeoutEmitted, paidAt, createdAt, Instant.now());
     }
 
     public Auction withExtendedEndTime(Instant newEndTime) {
-        return new Auction(id, productId, sellerId, startingPrice, bidIncrement, currentHighestBid,
+        return new Auction(id, productId, sellerId, startingPrice, bidIncrement, reservePrice, currentHighestBid,
                 currentHighestBidderId, status, startTime, newEndTime, extensionCount + 1, winnerId, finalPrice,
                 paymentDeadline, paymentTimeoutEmitted, paidAt, createdAt, Instant.now());
     }
 
     public Auction withSettlement(String newWinnerId, BigDecimal newFinalPrice, Instant newPaymentDeadline) {
-        return new Auction(id, productId, sellerId, startingPrice, bidIncrement, currentHighestBid,
+        return new Auction(id, productId, sellerId, startingPrice, bidIncrement, reservePrice, currentHighestBid,
                 currentHighestBidderId, AuctionStatus.ENDED, startTime, endTime, extensionCount, newWinnerId,
                 newFinalPrice, newPaymentDeadline, paymentTimeoutEmitted, paidAt, createdAt, Instant.now());
     }
 
     public Auction withPaymentTimeoutEmitted() {
-        return new Auction(id, productId, sellerId, startingPrice, bidIncrement, currentHighestBid,
+        return new Auction(id, productId, sellerId, startingPrice, bidIncrement, reservePrice, currentHighestBid,
                 currentHighestBidderId, status, startTime, endTime, extensionCount, winnerId, finalPrice,
                 paymentDeadline, true, paidAt, createdAt, Instant.now());
     }
 
     public Auction markPaid(Instant paidAt) {
-        return new Auction(id, productId, sellerId, startingPrice, bidIncrement, currentHighestBid,
+        return new Auction(id, productId, sellerId, startingPrice, bidIncrement, reservePrice, currentHighestBid,
                 currentHighestBidderId, status, startTime, endTime, extensionCount, winnerId, finalPrice,
                 paymentDeadline, paymentTimeoutEmitted, paidAt, createdAt, Instant.now());
+    }
+
+    public boolean hasReserve() {
+        return reservePrice != null;
+    }
+
+    // With no reserve it is always met. With one it is met only once the highest bid has reached it.
+    public boolean isReserveMet() {
+        return reservePrice == null
+                || (currentHighestBid != null && currentHighestBid.compareTo(reservePrice) >= 0);
     }
 
     public String getId() { return id; }
@@ -123,6 +157,7 @@ public class Auction {
     public String getSellerId() { return sellerId; }
     public BigDecimal getStartingPrice() { return startingPrice; }
     public BigDecimal getBidIncrement() { return bidIncrement; }
+    public BigDecimal getReservePrice() { return reservePrice; }
     public BigDecimal getCurrentHighestBid() { return currentHighestBid; }
     public String getCurrentHighestBidderId() { return currentHighestBidderId; }
     public AuctionStatus getStatus() { return status; }

@@ -26,6 +26,59 @@ class AuctionTest {
         assertThat(auction.getId()).isNotBlank();
     }
 
+    private static Auction withReserve(String reserve) {
+        return Auction.create("product-1", "seller-1", new BigDecimal("100.00"), new BigDecimal("10.00"),
+                reserve == null ? null : new BigDecimal(reserve), Instant.now(), Instant.now().plus(1, ChronoUnit.HOURS));
+    }
+
+    @Test
+    void anAuctionWithoutAReserve_hasNone_andItIsAlwaysMet() {
+        Auction auction = withReserve(null);
+
+        assertThat(auction.hasReserve()).isFalse();
+        assertThat(auction.isReserveMet()).isTrue();
+        assertThat(auction.withBid("b", new BigDecimal("100.00")).isReserveMet()).isTrue();
+    }
+
+    @Test
+    void aReserve_isNotMetBeforeAnyBid_andNotMetByABidBelowIt() {
+        Auction auction = withReserve("300.00");
+
+        assertThat(auction.hasReserve()).isTrue();
+        assertThat(auction.isReserveMet()).isFalse();
+        assertThat(auction.withBid("b", new BigDecimal("290.00")).isReserveMet()).isFalse();
+    }
+
+    @Test
+    void aReserve_isMetByABidEqualToItOrAboveIt() {
+        assertThat(withReserve("300.00").withBid("b", new BigDecimal("300.00")).isReserveMet()).isTrue();
+        assertThat(withReserve("300.00").withBid("b", new BigDecimal("310.00")).isReserveMet()).isTrue();
+    }
+
+    @Test
+    void theReserveSurvivesEveryChangeOfState() {
+        Auction auction = withReserve("300.00").withStatus(AuctionStatus.ACTIVE).withBid("b", new BigDecimal("120.00"))
+                .withExtendedEndTime(Instant.now().plus(2, ChronoUnit.HOURS));
+
+        assertThat(auction.getReservePrice()).isEqualByComparingTo("300.00");
+        assertThat(auction.withSettlement("b", new BigDecimal("120.00"), Instant.now()).getReservePrice())
+                .isEqualByComparingTo("300.00");
+    }
+
+    @Test
+    void withDetails_canChangeOrRemoveTheReserve_andTheOldFormKeepsIt() {
+        Auction auction = withReserve("300.00");
+        Instant start = Instant.now();
+        Instant end = start.plus(2, ChronoUnit.HOURS);
+
+        assertThat(auction.withDetails(new BigDecimal("100.00"), new BigDecimal("10.00"), new BigDecimal("400.00"),
+                start, end).getReservePrice()).isEqualByComparingTo("400.00");
+        assertThat(auction.withDetails(new BigDecimal("100.00"), new BigDecimal("10.00"), null, start, end)
+                .hasReserve()).isFalse();
+        assertThat(auction.withDetails(new BigDecimal("100.00"), new BigDecimal("10.00"), start, end)
+                .getReservePrice()).isEqualByComparingTo("300.00");
+    }
+
     @Test
     void withStatus_returnsNewInstanceWithUpdatedStatus() {
         Auction pending = Auction.create("product-1", "seller-1", new BigDecimal("100.00"),

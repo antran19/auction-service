@@ -53,6 +53,52 @@ class EndAuctionUseCaseTest {
         verify(eventPublisherPort).publish(any(AuctionWonEvent.class));
     }
 
+    private Auction activeAuctionWithReserve(String reserve) {
+        Instant now = Instant.now();
+        return Auction.create("product-1", "seller-1", new BigDecimal("100.00"), new BigDecimal("10.00"),
+                        new BigDecimal(reserve), now.minus(2, ChronoUnit.HOURS), now.minus(1, ChronoUnit.MINUTES))
+                .withStatus(AuctionStatus.ACTIVE);
+    }
+
+    @Test
+    void end_aReserveThatWasNotReached_endsWithoutAWinner_likeAnAuctionNobodyBidOn() {
+        Auction auction = activeAuctionWithReserve("300.00").withBid("bidder-1", new BigDecimal("250.00"));
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
+
+        useCase.end(auction.getId());
+
+        verify(auctionRepositoryPort).save(argThat(a ->
+                a.getStatus() == AuctionStatus.ENDED && a.getWinnerId() == null && a.getFinalPrice() == null
+                        && a.getPaymentDeadline() == null));
+        verify(eventPublisherPort).publish(any(AuctionEndedEvent.class));
+        verify(eventPublisherPort).publish(any(AuctionFailedEvent.class));
+        verify(eventPublisherPort, never()).publish(any(AuctionWonEvent.class));
+    }
+
+    @Test
+    void end_aReserveThatWasReached_settlesWithTheWinnerAtTheBidPrice() {
+        Auction auction = activeAuctionWithReserve("300.00").withBid("bidder-1", new BigDecimal("300.00"));
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
+
+        useCase.end(auction.getId());
+
+        verify(auctionRepositoryPort).save(argThat(a ->
+                "bidder-1".equals(a.getWinnerId()) && a.getFinalPrice().compareTo(new BigDecimal("300.00")) == 0));
+        verify(eventPublisherPort).publish(any(AuctionWonEvent.class));
+        verify(eventPublisherPort, never()).publish(any(AuctionFailedEvent.class));
+    }
+
+    @Test
+    void end_aReserveWithNoBidsAtAll_failsLikeAnyOtherAuctionWithoutBids() {
+        Auction auction = activeAuctionWithReserve("300.00");
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
+
+        useCase.end(auction.getId());
+
+        verify(eventPublisherPort).publish(any(AuctionFailedEvent.class));
+        verify(eventPublisherPort, never()).publish(any(AuctionWonEvent.class));
+    }
+
     @Test
     void end_marksAuctionFailedWhenThereWereNoBids() {
         Auction auction = activeAuctionPastEndTime();

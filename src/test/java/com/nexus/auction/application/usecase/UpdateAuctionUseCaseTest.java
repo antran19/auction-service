@@ -59,6 +59,34 @@ class UpdateAuctionUseCaseTest {
     }
 
     @Test
+    void update_canSetAndThenRemoveAReserve_whilePending() {
+        Auction auction = pendingAuction();
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
+        Instant newStart = Instant.now().plus(3, ChronoUnit.HOURS);
+        Instant newEnd = newStart.plus(2, ChronoUnit.HOURS);
+
+        AuctionResult withReserve = useCase.update(auction.getId(), new BigDecimal("100.00"), new BigDecimal("10.00"),
+                new BigDecimal("500.00"), newStart, newEnd, "seller-1");
+        AuctionResult without = useCase.update(auction.getId(), new BigDecimal("100.00"), new BigDecimal("10.00"),
+                null, newStart, newEnd, "seller-1");
+
+        assertThat(withReserve.hasReserve()).isTrue();
+        assertThat(without.hasReserve()).isFalse();
+    }
+
+    @Test
+    void update_aReserveBelowTheNewStartingPrice_isRejected_andNothingIsSaved() {
+        Auction auction = pendingAuction();
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
+        Instant newStart = Instant.now().plus(3, ChronoUnit.HOURS);
+
+        assertThatThrownBy(() -> useCase.update(auction.getId(), new BigDecimal("200.00"), new BigDecimal("10.00"),
+                new BigDecimal("150.00"), newStart, newStart.plus(2, ChronoUnit.HOURS), "seller-1"))
+                .isInstanceOf(com.nexus.common.core.exception.ValidationException.class);
+        verify(auctionRepositoryPort, never()).save(any());
+    }
+
+    @Test
     void update_rejectsNonOwner() {
         Auction auction = pendingAuction();
         when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));

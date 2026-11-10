@@ -18,10 +18,17 @@ public class UpdateAuctionUseCase {
         this.auctionRepositoryPort = auctionRepositoryPort;
     }
 
-    @Transactional
+    // Without a reserve (an update replaces the details, so this removes any reserve).
     public AuctionResult update(String id, BigDecimal startingPrice, BigDecimal bidIncrement,
                                  Instant startTime, Instant endTime, String callerId) {
+        return update(id, startingPrice, bidIncrement, null, startTime, endTime, callerId);
+    }
+
+    @Transactional
+    public AuctionResult update(String id, BigDecimal startingPrice, BigDecimal bidIncrement, BigDecimal reservePrice,
+                                 Instant startTime, Instant endTime, String callerId) {
         CreateAuctionUseCase.validateWindow(startTime, endTime);
+        CreateAuctionUseCase.validateReserve(startingPrice, reservePrice);
 
         Auction existing = auctionRepositoryPort.findByIdForUpdate(id).orElseThrow(() -> new AuctionNotFoundException(id));
         AuctionOwnershipPolicy.requireOwner(existing, callerId);
@@ -30,7 +37,7 @@ public class UpdateAuctionUseCase {
                     "Only a pending auction can be updated: " + id);
         }
 
-        Auction updated = auctionRepositoryPort.save(existing.withDetails(startingPrice, bidIncrement, startTime, endTime));
+        Auction updated = auctionRepositoryPort.save(existing.withDetails(startingPrice, bidIncrement, reservePrice, startTime, endTime));
         return CreateAuctionUseCase.toResult(updated);
     }
 }

@@ -54,6 +54,31 @@ class AuctionCheckConstraintsTest {
                 """, id, UUID.randomUUID(), startingPrice, bidIncrement, status, startOffset, endOffset);
     }
 
+    private void insertWithReserve(String startingPrice, String reservePrice) {
+        jdbcTemplate.update("""
+                INSERT INTO auctions (id, product_id, seller_id, starting_price, bid_increment, reserve_price, status,
+                                       start_time, end_time)
+                VALUES (?, ?, 'seller-1', CAST(? AS NUMERIC), 10.00, CAST(? AS NUMERIC), 'ACTIVE',
+                        now() - interval '60 minutes', now() + interval '60 minutes')
+                """, UUID.randomUUID(), UUID.randomUUID(), startingPrice, reservePrice);
+    }
+
+    @Test
+    void aReserveBelowTheStartingPrice_isRefusedByTheDatabase() {
+        assertThatThrownBy(() -> insertWithReserve("100.00", "99.99"))
+                .hasMessageContaining("chk_auctions_reserve_price");
+    }
+
+    @Test
+    void aReserveAtOrAboveTheStartingPrice_orNone_isAccepted() {
+        assertThatCode(() -> insertWithReserve("100.00", "100.00")).doesNotThrowAnyException();
+        assertThatCode(() -> insertWithReserve("100.00", "500.00")).doesNotThrowAnyException();
+        assertThatCode(() -> jdbcTemplate.update("""
+                INSERT INTO auctions (id, product_id, seller_id, starting_price, bid_increment, status, start_time, end_time)
+                VALUES (?, ?, 'seller-1', 100.00, 10.00, 'ACTIVE', now() - interval '60 minutes', now() + interval '60 minutes')
+                """, UUID.randomUUID(), UUID.randomUUID())).doesNotThrowAnyException();
+    }
+
     private void insertValidAuction(UUID id) {
         insertAuction(id, "ACTIVE", "-60", "60", "100.00", "10.00");
     }

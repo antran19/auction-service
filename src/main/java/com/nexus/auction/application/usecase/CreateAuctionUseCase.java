@@ -13,6 +13,7 @@ import com.nexus.common.core.exception.ValidationException;
 import com.nexus.common.events.AuctionCreatedEvent;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -47,6 +48,7 @@ public class CreateAuctionUseCase {
         }
 
         validateWindow(command.startTime(), command.endTime());
+        validateReserve(command.startingPrice(), command.reservePrice());
         requireOwnProductInStock(command.productId(), command.sellerId());
 
         if (auctionRepositoryPort.existsActiveOrPendingForProduct(command.productId())) {
@@ -59,7 +61,7 @@ public class CreateAuctionUseCase {
         }
 
         Auction auction = Auction.create(command.productId(), command.sellerId(), command.startingPrice(),
-                command.bidIncrement(), command.startTime(), command.endTime());
+                command.bidIncrement(), command.reservePrice(), command.startTime(), command.endTime());
         Auction saved = auctionRepositoryPort.save(auction);
 
         eventPublisherPort.publish(new AuctionCreatedEvent(saved.getId(), saved.getProductId(), saved.getSellerId()));
@@ -104,10 +106,19 @@ public class CreateAuctionUseCase {
         }
     }
 
+    // A reserve is optional; when given it must be at least the starting price, or it could never matter.
+    // Package-private so UpdateAuctionUseCase holds an edit to the same rule.
+    static void validateReserve(BigDecimal startingPrice, BigDecimal reservePrice) {
+        if (reservePrice != null && reservePrice.compareTo(startingPrice) < 0) {
+            throw new ValidationException(List.of(new FieldError("reservePrice",
+                    "reservePrice must be at least the starting price")));
+        }
+    }
+
     static AuctionResult toResult(Auction a) {
         return new AuctionResult(a.getId(), a.getProductId(), a.getSellerId(), a.getStartingPrice(),
                 a.getBidIncrement(), a.getCurrentHighestBid(), a.getCurrentHighestBidderId(), a.getStatus().name(),
                 a.getStartTime(), a.getEndTime(), a.getExtensionCount(), a.getWinnerId(), a.getFinalPrice(),
-                a.getPaymentDeadline(), a.getPaidAt());
+                a.getPaymentDeadline(), a.getPaidAt(), a.hasReserve(), a.isReserveMet());
     }
 }

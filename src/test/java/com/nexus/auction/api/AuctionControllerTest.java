@@ -88,6 +88,55 @@ class AuctionControllerTest {
     }
 
     @Test
+    void create_passesTheReserveIntoTheCommand_andTheResponseNeverRevealsIt() throws Exception {
+        authenticateAs("seller-id", "AUCTION.CREATE");
+        when(createAuctionUseCase.create(any())).thenReturn(new AuctionResult("auction-id", "product-1", "seller-id",
+                new BigDecimal("100.00"), new BigDecimal("10.00"), null, null, "PENDING", Instant.now(),
+                Instant.now().plus(2, ChronoUnit.HOURS), 0, null, null, null, null, true, false));
+
+        mockMvc.perform(post("/api/v1/auctions")
+                        .header("Authorization", "Bearer good-token")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"productId":"product-1","startingPrice":100.00,"bidIncrement":10.00,"reservePrice":300.00,
+                                 "startTime":"2026-10-01T00:00:00Z","endTime":"2026-10-02T00:00:00Z"}"""))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.hasReserve").value(true))
+                .andExpect(jsonPath("$.data.reserveMet").value(false))
+                .andExpect(jsonPath("$.data.reservePrice").doesNotExist());
+
+        verify(createAuctionUseCase).create(argThat(
+                (CreateAuctionCommand cmd) -> cmd.reservePrice().compareTo(new BigDecimal("300.00")) == 0));
+    }
+
+    @Test
+    void create_aReserveOfZeroOrLess_is400() throws Exception {
+        authenticateAs("seller-id", "AUCTION.CREATE");
+
+        mockMvc.perform(post("/api/v1/auctions")
+                        .header("Authorization", "Bearer good-token")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"productId":"product-1","startingPrice":100.00,"bidIncrement":10.00,"reservePrice":0,
+                                 "startTime":"2026-10-01T00:00:00Z","endTime":"2026-10-02T00:00:00Z"}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.fieldErrors[0].field").value("reservePrice"));
+    }
+
+    @Test
+    void get_theOpenAuctionTellsWhetherTheReserveIsMet_butNeverItsAmount() throws Exception {
+        when(getAuctionUseCase.get("a-id")).thenReturn(new AuctionResult("auction-id", "product-1", "seller-id",
+                new BigDecimal("100.00"), new BigDecimal("10.00"), new BigDecimal("150.00"), "b", "ACTIVE",
+                Instant.now(), Instant.now().plus(2, ChronoUnit.HOURS), 0, null, null, null, null, true, false));
+
+        mockMvc.perform(get("/api/v1/auctions/a-id"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.hasReserve").value(true))
+                .andExpect(jsonPath("$.data.reserveMet").value(false))
+                .andExpect(jsonPath("$.data.reservePrice").doesNotExist());
+    }
+
+    @Test
     void create_passesTrustLevelClaimFromTokenIntoCommand() throws Exception {
         when(jwtTokenProvider.isValid("good-token")).thenReturn(true);
         Claims claims = Jwts.claims().subject("seller-id").add("privileges", List.of("AUCTION.CREATE"))

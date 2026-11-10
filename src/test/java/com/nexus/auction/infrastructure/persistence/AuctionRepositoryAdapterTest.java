@@ -48,6 +48,36 @@ class AuctionRepositoryAdapterTest {
                 Instant.now(), Instant.now().plus(1, ChronoUnit.HOURS));
     }
 
+    // bidIncrement, reservePrice and currentHighestBid sit side by side as BigDecimal, so a swap in the mapping
+    // would still compile: each gets a different value here to prove they land in their own columns.
+    @Test
+    void theReservePrice_isStoredAndReadBack_inItsOwnColumn() {
+        Auction auction = Auction.create("11111111-1111-1111-1111-111111111111", "seller-1", new BigDecimal("100.00"),
+                        new BigDecimal("10.00"), new BigDecimal("300.00"), Instant.now(), Instant.now().plus(2, ChronoUnit.HOURS))
+                .withStatus(AuctionStatus.ACTIVE).withBid("bidder-1", new BigDecimal("150.00"));
+        adapter.save(auction);
+
+        Auction found = adapter.findById(auction.getId()).orElseThrow();
+
+        assertThat(found.getStartingPrice()).isEqualByComparingTo("100.00");
+        assertThat(found.getBidIncrement()).isEqualByComparingTo("10.00");
+        assertThat(found.getReservePrice()).isEqualByComparingTo("300.00");
+        assertThat(found.getCurrentHighestBid()).isEqualByComparingTo("150.00");
+        assertThat(found.isReserveMet()).isFalse();
+    }
+
+    @Test
+    void anAuctionWithoutAReserve_isReadBackWithNone() {
+        Auction auction = Auction.create("22222222-2222-2222-2222-222222222222", "seller-1", new BigDecimal("100.00"),
+                new BigDecimal("10.00"), Instant.now(), Instant.now().plus(2, ChronoUnit.HOURS));
+        adapter.save(auction);
+
+        Auction found = adapter.findById(auction.getId()).orElseThrow();
+
+        assertThat(found.getReservePrice()).isNull();
+        assertThat(found.hasReserve()).isFalse();
+    }
+
     @Test
     void saveThenFindById_roundTripsTheAuction() {
         Auction auction = newAuction();

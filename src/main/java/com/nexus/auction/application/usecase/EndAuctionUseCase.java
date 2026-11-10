@@ -39,7 +39,8 @@ public class EndAuctionUseCase {
             return;
         }
 
-        boolean hasWinner = auction.getCurrentHighestBidderId() != null;
+        // Bids that never reached the seller's reserve do not make a sale: it ends like an auction nobody bid on.
+        boolean hasWinner = auction.getCurrentHighestBidderId() != null && auction.isReserveMet();
         Auction ended;
         if (hasWinner) {
             Instant paymentDeadline = Instant.now().plus(PAYMENT_DEADLINE_HOURS, ChronoUnit.HOURS);

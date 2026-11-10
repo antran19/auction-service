@@ -25,6 +25,9 @@ public class AuctionJpaEntity {
     @Column(name = "bid_increment", nullable = false)
     private BigDecimal bidIncrement;
 
+    @Column(name = "reserve_price")
+    private BigDecimal reservePrice;
+
     @Column(name = "current_highest_bid")
     private BigDecimal currentHighestBid;
 
@@ -68,8 +71,8 @@ public class AuctionJpaEntity {
     }
 
     public AuctionJpaEntity(UUID id, UUID productId, String sellerId, BigDecimal startingPrice,
-                             BigDecimal bidIncrement, BigDecimal currentHighestBid, String currentHighestBidderId,
-                             String status, Instant startTime, Instant endTime, int extensionCount, String winnerId,
+                             BigDecimal bidIncrement, BigDecimal reservePrice, BigDecimal currentHighestBid,
+                             String currentHighestBidderId, String status, Instant startTime, Instant endTime, int extensionCount, String winnerId,
                              BigDecimal finalPrice, Instant paymentDeadline, boolean paymentTimeoutEmitted,
                              Instant paidAt, Instant createdAt, Instant updatedAt) {
         this.id = id;
@@ -77,6 +80,7 @@ public class AuctionJpaEntity {
         this.sellerId = sellerId;
         this.startingPrice = startingPrice;
         this.bidIncrement = bidIncrement;
+        this.reservePrice = reservePrice;
         this.currentHighestBid = currentHighestBid;
         this.currentHighestBidderId = currentHighestBidderId;
         this.status = status;
@@ -97,6 +101,7 @@ public class AuctionJpaEntity {
     public String getSellerId() { return sellerId; }
     public BigDecimal getStartingPrice() { return startingPrice; }
     public BigDecimal getBidIncrement() { return bidIncrement; }
+    public BigDecimal getReservePrice() { return reservePrice; }
     public BigDecimal getCurrentHighestBid() { return currentHighestBid; }
     public String getCurrentHighestBidderId() { return currentHighestBidderId; }
     public String getStatus() { return status; }

@@ -6,5 +6,6 @@ import java.time.Instant;
 public record AuctionResponse(String id, String productId, String sellerId, BigDecimal startingPrice,
                                BigDecimal bidIncrement, BigDecimal currentHighestBid, String currentHighestBidderId,
                                String status, Instant startTime, Instant endTime, int extensionCount,
-                               String winnerId, BigDecimal finalPrice, Instant paymentDeadline, Instant paidAt) {
+                               String winnerId, BigDecimal finalPrice, Instant paymentDeadline, Instant paidAt,
+                               boolean hasReserve, boolean reserveMet) {
 }
