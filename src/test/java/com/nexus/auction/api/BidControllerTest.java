@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -50,6 +51,37 @@ class BidControllerTest {
                         .contentType(APPLICATION_JSON)
                         .content("{\"amount\":100.00}"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void placeBid_returns400WhenTheAmountIsTooBigForTheDatabaseColumn() throws Exception {
+        when(jwtTokenProvider.isValid("good-token")).thenReturn(true);
+        Claims claims = Jwts.claims().subject("bidder-id").add("privileges", List.of("AUCTION.BID")).build();
+        when(jwtTokenProvider.parseClaims("good-token")).thenReturn(claims);
+
+        mockMvc.perform(post("/api/v1/auctions/a-id/bids")
+                        .header("Authorization", "Bearer good-token")
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"amount\":99999999999}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.fieldErrors[0].field").value("amount"));
+        verifyNoInteractions(placeBidUseCase);
+    }
+
+    @Test
+    void placeBid_returns400WhenTheAmountHasMoreThanTwoDecimals() throws Exception {
+        when(jwtTokenProvider.isValid("good-token")).thenReturn(true);
+        Claims claims = Jwts.claims().subject("bidder-id").add("privileges", List.of("AUCTION.BID")).build();
+        when(jwtTokenProvider.parseClaims("good-token")).thenReturn(claims);
+
+        mockMvc.perform(post("/api/v1/auctions/a-id/bids")
+                        .header("Authorization", "Bearer good-token")
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"amount\":100.555}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+        verifyNoInteractions(placeBidUseCase);
     }
 
     @Test

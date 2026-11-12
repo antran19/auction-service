@@ -70,6 +70,22 @@ class AuctionControllerTest {
     }
 
     @Test
+    void create_returns400WhenAPriceIsTooBigForTheDatabaseColumn() throws Exception {
+        authenticateAs("seller-id", "AUCTION.CREATE");
+
+        mockMvc.perform(post("/api/v1/auctions")
+                        .header("Authorization", "Bearer good-token")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"productId":"product-1","startingPrice":99999999999,"bidIncrement":10.00,
+                                 "startTime":"2026-10-01T00:00:00Z","endTime":"2026-10-02T00:00:00Z"}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.fieldErrors[0].field").value("startingPrice"));
+        verifyNoInteractions(createAuctionUseCase);
+    }
+
+    @Test
     void create_ignoresSpoofedSellerId_usesJwtSubjectInstead() throws Exception {
         authenticateAs("seller-id", "AUCTION.CREATE");
         when(createAuctionUseCase.create(any())).thenReturn(sampleResult("seller-id"));

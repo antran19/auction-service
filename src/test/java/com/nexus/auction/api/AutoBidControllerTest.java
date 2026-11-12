@@ -67,6 +67,17 @@ class AutoBidControllerTest {
     }
 
     @Test
+    void setAutoBid_returns400WhenTheMaximumIsTooBigForTheDatabaseColumn() throws Exception {
+        authenticateAs("bidder-1", "AUCTION.BID");
+
+        mockMvc.perform(put(URL).header("Authorization", "Bearer good-token")
+                        .contentType(APPLICATION_JSON).content("{\"maxAmount\":99999999999}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.fieldErrors[0].field").value("maxAmount"));
+        verify(setAutoBidUseCase, never()).setAutoBid(anyString(), anyString(), any(), any());
+    }
+
+    @Test
     void setAutoBid_returns403WithoutTheBidPrivilege() throws Exception {
         authenticateAs("bidder-1", "AUCTION.VIEW");
 
