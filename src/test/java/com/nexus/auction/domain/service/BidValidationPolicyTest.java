@@ -17,6 +17,25 @@ class BidValidationPolicyTest {
 
     private static final String BIDDER_ID = "bidder-1";
 
+    @Test
+    void rejectSelfOutbid_refusesTheCurrentHighestBidder() {
+        Auction leading = activeAuctionNoBidsYet().withBid(BIDDER_ID, new BigDecimal("100.00"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> BidValidationPolicy.rejectSelfOutbid(leading, BIDDER_ID))
+                .isInstanceOfSatisfying(com.nexus.common.core.exception.ConflictException.class,
+                        e -> org.assertj.core.api.Assertions.assertThat(e.getErrorCode()).isEqualTo("ALREADY_HIGHEST_BIDDER"));
+    }
+
+    @Test
+    void rejectSelfOutbid_allowsAnyoneElseAndTheFirstBidder() {
+        Auction leading = activeAuctionNoBidsYet().withBid(BIDDER_ID, new BigDecimal("100.00"));
+
+        org.assertj.core.api.Assertions.assertThatCode(() -> BidValidationPolicy.rejectSelfOutbid(leading, "bidder-2"))
+                .doesNotThrowAnyException();
+        org.assertj.core.api.Assertions.assertThatCode(() -> BidValidationPolicy.rejectSelfOutbid(activeAuctionNoBidsYet(), BIDDER_ID))
+                .doesNotThrowAnyException();
+    }
+
     private Auction activeAuctionNoBidsYet() {
         return Auction.create("product-1", "seller-1", new BigDecimal("100.00"), new BigDecimal("10.00"),
                         Instant.now().minus(1, ChronoUnit.HOURS), Instant.now().plus(1, ChronoUnit.HOURS))

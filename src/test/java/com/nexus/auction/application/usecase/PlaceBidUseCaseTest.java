@@ -174,6 +174,30 @@ class PlaceBidUseCaseTest {
     }
 
     @Test
+    void placeBid_refusesTheCurrentHighestBidderRaisingTheirOwnBid_andStoresNothing() {
+        Auction auction = activeAuction().withBid("bidder-1", new BigDecimal("100.00"));
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
+
+        assertThatThrownBy(() -> useCase.placeBid(auction.getId(), "bidder-1", new BigDecimal("150.00"), "TRUSTED"))
+                .isInstanceOfSatisfying(com.nexus.common.core.exception.ConflictException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo("ALREADY_HIGHEST_BIDDER"));
+        verify(bidRepositoryPort, never()).save(any());
+        verify(auctionRepositoryPort, never()).save(any());
+        verifyNoInteractions(bidBroadcastPort);
+    }
+
+    @Test
+    void placeBid_letsTheLeaderBidAgainOnceSomeoneElseHasOutbidThem() {
+        Auction auction = activeAuction().withBid("bidder-1", new BigDecimal("100.00"))
+                .withBid("bidder-2", new BigDecimal("110.00"));
+        when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));
+
+        BidResult result = useCase.placeBid(auction.getId(), "bidder-1", new BigDecimal("120.00"), "TRUSTED");
+
+        assertThat(result.bidderId()).isEqualTo("bidder-1");
+    }
+
+    @Test
     void placeBid_doesNotPublishOutbidWhenThereWasNoPreviousBidder() {
         Auction auction = activeAuction();
         when(auctionRepositoryPort.findByIdForUpdate(auction.getId())).thenReturn(Optional.of(auction));

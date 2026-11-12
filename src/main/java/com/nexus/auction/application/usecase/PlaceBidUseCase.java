@@ -57,6 +57,7 @@ public class PlaceBidUseCase {
                 .orElseThrow(() -> new AuctionNotFoundException(auctionId));
 
         BidValidationPolicy.validate(auction, bidderId, amount, Instant.now());
+        BidValidationPolicy.rejectSelfOutbid(auction, bidderId);
 
         String previousHighestBidderId = auction.getCurrentHighestBidderId();
 

@@ -15,6 +15,18 @@ public final class BidValidationPolicy {
     private BidValidationPolicy() {
     }
 
+    /**
+     * The highest bidder cannot raise their own bid by hand: it would only push the price up against nobody, and in
+     * the last minutes it would keep extending the auction. Kept apart from {@link #validate} because setting a
+     * maximum for automatic bidding goes through {@code validate} too, and the leader may do that to defend the lead.
+     */
+    public static void rejectSelfOutbid(Auction auction, String bidderId) {
+        if (bidderId.equals(auction.getCurrentHighestBidderId())) {
+            throw new ConflictException("ALREADY_HIGHEST_BIDDER",
+                    "You already have the highest bid on this auction: " + auction.getId());
+        }
+    }
+
     public static void validate(Auction auction, String bidderId, BigDecimal amount, Instant now) {
         if (auction.getStatus() != AuctionStatus.ACTIVE) {
             throw new ConflictException("AUCTION_NOT_ACTIVE",
